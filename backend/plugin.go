@@ -24,15 +24,15 @@ func (p *omniboardPlugin) Init(ctx *plugin.Context) error {
 	p.log = ctx.Log()
 
 	// ── Project-scope routes ───────────────────────────────────────────────
-	ctx.Route("GET", "/omniboard/boards", p.listBoards)
-	ctx.Route("POST", "/omniboard/boards", p.createBoard)
-	ctx.Route("GET", "/omniboard/boards/:boardId", p.getBoard)
-	ctx.Route("PATCH", "/omniboard/boards/:boardId", p.updateBoard)
-	ctx.Route("DELETE", "/omniboard/boards/:boardId", p.deleteBoard)
-	ctx.Route("GET", "/omniboard/projects", p.listProjects)
-	ctx.Route("GET", "/omniboard/statuses", p.listStatuses)
-	ctx.Route("GET", "/omniboard/boards/:boardId/tasks", p.getBoardTasks)
-	ctx.Route("PATCH", "/omniboard/tasks/:taskId/status", p.updateTaskStatus)
+	ctx.Route("GET", "/projects/:projectId/omniboard/boards", p.listBoards)
+	ctx.Route("POST", "/projects/:projectId/omniboard/boards", p.createBoard)
+	ctx.Route("GET", "/projects/:projectId/omniboard/boards/:boardId", p.getBoard)
+	ctx.Route("PATCH", "/projects/:projectId/omniboard/boards/:boardId", p.updateBoard)
+	ctx.Route("DELETE", "/projects/:projectId/omniboard/boards/:boardId", p.deleteBoard)
+	ctx.Route("GET", "/projects/:projectId/omniboard/projects", p.listProjects)
+	ctx.Route("GET", "/projects/:projectId/omniboard/statuses", p.listStatuses)
+	ctx.Route("GET", "/projects/:projectId/omniboard/boards/:boardId/tasks", p.getBoardTasks)
+	ctx.Route("PATCH", "/projects/:projectId/omniboard/tasks/:taskId/status", p.updateTaskStatus)
 
 	// ── Admin-scope routes ──────────────────────────────────────────────────
 	ctx.Route("GET", "/omniboard/admin-boards", p.listBoards)

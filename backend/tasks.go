@@ -89,7 +89,8 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		FROM tasks t
 		JOIN projects p ON t.project_id = p.id
 		LEFT JOIN task_statuses ts ON t.status_id = ts.id
-		LEFT JOIN users u ON t.assignee_id = u.id
+		LEFT JOIN project_members pm ON t.assignee_id = pm.id
+		LEFT JOIN users u ON pm.user_id = u.id OR t.assignee_id = u.id
 		WHERE 1=1`,
 	}
 

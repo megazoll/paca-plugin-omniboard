@@ -13,27 +13,31 @@ import type {
 } from "./types";
 
 function getBasePath(api: PluginApiClient, scope: OmniboardScope): string {
-  return scope === "admin"
-    ? "/omniboard/admin-boards"
-    : `/projects/${api.projectId}/omniboard/boards`;
+  if (scope === "admin" || !api.projectId) {
+    return "/omniboard/admin-boards";
+  }
+  return `/projects/${api.projectId}/omniboard/boards`;
 }
 
 function getProjectsPath(api: PluginApiClient, scope: OmniboardScope): string {
-  return scope === "admin"
-    ? "/omniboard/admin-projects"
-    : `/projects/${api.projectId}/omniboard/projects`;
+  if (scope === "admin" || !api.projectId) {
+    return "/omniboard/admin-projects";
+  }
+  return `/projects/${api.projectId}/omniboard/projects`;
 }
 
 function getStatusesPath(api: PluginApiClient, scope: OmniboardScope): string {
-  return scope === "admin"
-    ? "/omniboard/admin-statuses"
-    : `/projects/${api.projectId}/omniboard/statuses`;
+  if (scope === "admin" || !api.projectId) {
+    return "/omniboard/admin-statuses";
+  }
+  return `/projects/${api.projectId}/omniboard/statuses`;
 }
 
 function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
-  return scope === "admin"
-    ? `/omniboard/admin-tasks/${taskId}/status`
-    : `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
+  if (scope === "admin" || !api.projectId) {
+    return `/omniboard/admin-tasks/${taskId}/status`;
+  }
+  return `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS omniboards (
     project_ids   JSONB       NOT NULL DEFAULT '[]'::jsonb,
     column_config JSONB       NOT NULL DEFAULT '[]'::jsonb,
     filters       JSONB       NOT NULL DEFAULT '{}'::jsonb,
-    created_by    UUID        REFERENCES project_members(id) ON DELETE SET NULL,
+    created_by    UUID,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

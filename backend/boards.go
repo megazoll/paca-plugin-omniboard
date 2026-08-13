@@ -10,9 +10,9 @@ import (
 func defaultColumnConfigJSON() string {
 	cols := []ColumnConfig{
 		{ID: "col-backlog", Title: "Backlog", StatusCategories: []string{"backlog"}, Color: "#64748b"},
-		{ID: "col-todo", Title: "To Do", StatusCategories: []string{"todo"}, Color: "#eab308"},
-		{ID: "col-inprogress", Title: "In Progress", StatusCategories: []string{"inprogress"}, Color: "#3b82f6"},
-		{ID: "col-done", Title: "Done", StatusCategories: []string{"done"}, Color: "#22c55e"},
+		{ID: "col-todo", Title: "To Do", StatusCategories: []string{"todo", "to_do", "open"}, Color: "#eab308"},
+		{ID: "col-inprogress", Title: "In Progress", StatusCategories: []string{"inprogress", "in_progress", "in_review", "doing"}, Color: "#3b82f6"},
+		{ID: "col-done", Title: "Done", StatusCategories: []string{"done", "completed", "closed", "resolved"}, Color: "#22c55e"},
 	}
 	b, _ := json.Marshal(cols)
 	return string(b)
@@ -32,9 +32,10 @@ func (p *omniboardPlugin) listBoards(req *plugin.Request, res *plugin.Response) 
 	query := `
 		SELECT id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
 		FROM omniboards
+		WHERE scope = $1
 		ORDER BY created_at ASC
 	`
-	rows, err := p.db.Query(query)
+	rows, err := p.db.Query(query, scope)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to query boards: %v", err)})
 		return
