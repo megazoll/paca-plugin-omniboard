@@ -14,6 +14,7 @@ interface BoardSettingsModalProps {
     project_ids: string[];
     column_config: ColumnConfig[];
   }) => void;
+  onDelete?: () => void;
   isSaving?: boolean;
 }
 
@@ -24,14 +25,17 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
   projects,
   statuses,
   onSave,
+  onDelete,
   isSaving,
 }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
+    setConfirmDelete(false);
     if (board) {
       setName(board.name || "");
       setDescription(board.description || "");
@@ -276,22 +280,60 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-9 px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving || !name.trim()}
-              className="h-9 px-4 flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <Check className="size-4" />
-              <span>{isSaving ? "Saving..." : "Save Settings"}</span>
-            </button>
+          <div className="flex items-center justify-between gap-2 pt-4 border-t border-border">
+            <div>
+              {board && onDelete && (
+                !confirmDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="h-9 px-3 flex items-center gap-1.5 text-xs text-destructive border border-destructive/30 hover:bg-destructive/10 font-medium rounded-md transition-colors"
+                  >
+                    <Trash2 className="size-3.5" />
+                    <span>Delete Board</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-destructive/10 border border-destructive/30 p-1 rounded-md">
+                    <span className="text-xs text-destructive font-medium px-1">Delete this board?</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDelete();
+                        onClose();
+                      }}
+                      className="h-7 px-2 bg-destructive text-destructive-foreground text-xs font-semibold rounded hover:bg-destructive/90 transition-colors"
+                    >
+                      Yes, Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className="h-7 px-2 text-xs font-medium hover:bg-accent rounded transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 px-4 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving || !name.trim()}
+                className="h-9 px-4 flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                <Check className="size-4" />
+                <span>{isSaving ? "Saving..." : "Save Settings"}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>

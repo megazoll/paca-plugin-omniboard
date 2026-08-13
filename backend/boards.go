@@ -29,12 +29,7 @@ func (p *omniboardPlugin) listBoards(req *plugin.Request, res *plugin.Response) 
 		}
 	}
 
-	query := `
-		SELECT id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
-		FROM omniboards
-		WHERE scope = $1
-		ORDER BY created_at ASC
-	`
+	query := `SELECT id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at FROM omniboards WHERE scope = $1 ORDER BY created_at ASC`
 	rows, err := p.db.Query(query, scope)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to query boards: %v", err)})
@@ -108,11 +103,7 @@ func (p *omniboardPlugin) createBoard(req *plugin.Request, res *plugin.Response)
 		projIDParam = req.Caller.ProjectID
 	}
 
-	insertSQL := `
-		INSERT INTO omniboards (project_id, scope, name, description, project_ids, column_config, filters, created_by, updated_at)
-		VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9)
-		RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
-	`
+	insertSQL := `INSERT INTO omniboards (project_id, scope, name, description, project_ids, column_config, filters, created_by, updated_at) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9) RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at`
 
 	now := nowStr()
 	rows, err := p.db.Query(insertSQL, projIDParam, scope, input.Name, input.Description, projectIDsJSON, colConfigJSON, filtersJSON, nullableUUID(req.Caller.CallerID), now)
@@ -132,11 +123,7 @@ func (p *omniboardPlugin) createBoard(req *plugin.Request, res *plugin.Response)
 // getBoard returns a single board by ID.
 func (p *omniboardPlugin) getBoard(req *plugin.Request, res *plugin.Response) {
 	boardID := req.PathParam("boardId")
-	query := `
-		SELECT id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
-		FROM omniboards
-		WHERE id = $1
-	`
+	query := `SELECT id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at FROM omniboards WHERE id = $1`
 	rows, err := p.db.Query(query, boardID)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to get board: %v", err)})
@@ -212,12 +199,7 @@ func (p *omniboardPlugin) updateBoard(req *plugin.Request, res *plugin.Response)
 		filtersJSON = string(b)
 	}
 
-	updateSQL := `
-		UPDATE omniboards
-		SET name = $1, description = $2, project_ids = $3::jsonb, column_config = $4::jsonb, filters = $5::jsonb, updated_at = $6
-		WHERE id = $7
-		RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
-	`
+	updateSQL := `UPDATE omniboards SET name = $1, description = $2, project_ids = $3::jsonb, column_config = $4::jsonb, filters = $5::jsonb, updated_at = $6 WHERE id = $7 RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at`
 	now := nowStr()
 	updatedRows, err := p.db.Query(updateSQL, name, description, projectIDsJSON, colConfigJSON, filtersJSON, now, boardID)
 	if err != nil {
@@ -252,11 +234,7 @@ func createDefaultBoard(db *plugin.DB, projIDStr string, scope string, callerID 
 		projIDParam = projIDStr
 	}
 	colConfigJSON := defaultColumnConfigJSON()
-	insertSQL := `
-		INSERT INTO omniboards (project_id, scope, name, description, project_ids, column_config, filters, created_by, updated_at)
-		VALUES ($1, $2, 'Main Omniboard', 'Multi-project Kanban board', '[]'::jsonb, $3::jsonb, '{}'::jsonb, $4, $5)
-		RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at
-	`
+	insertSQL := `INSERT INTO omniboards (project_id, scope, name, description, project_ids, column_config, filters, created_by, updated_at) VALUES ($1, $2, 'Main Omniboard', 'Multi-project Kanban board', '[]'::jsonb, $3::jsonb, '{}'::jsonb, $4, $5) RETURNING id, project_id, scope, name, description, project_ids, column_config, filters, created_at, updated_at`
 	rows, err := db.Query(insertSQL, projIDParam, scope, colConfigJSON, callerID, nowStr())
 	if err != nil {
 		return nil

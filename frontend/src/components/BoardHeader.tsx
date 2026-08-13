@@ -5,7 +5,6 @@ import {
   Settings,
   Search,
   RefreshCw,
-  Trash2,
   Layers,
 } from "lucide-react";
 import type { BoardFilters, Omniboard, ProjectInfo } from "../types";
@@ -18,7 +17,6 @@ interface BoardHeaderProps {
   onSelectBoard: (boardId: string) => void;
   onCreateBoardClick: () => void;
   onSettingsClick: () => void;
-  onDeleteBoardClick: () => void;
   onFilterChange: (newFilters: BoardFilters) => void;
   onRefresh: () => void;
   isFetching?: boolean;
@@ -32,7 +30,6 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
   onSelectBoard,
   onCreateBoardClick,
   onSettingsClick,
-  onDeleteBoardClick,
   onFilterChange,
   onRefresh,
   isFetching,
@@ -85,28 +82,15 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           </button>
 
           {activeBoard && (
-            <>
-              <button
-                type="button"
-                onClick={onSettingsClick}
-                className="h-9 px-3 flex items-center gap-1.5 bg-secondary text-secondary-foreground border border-input text-sm font-medium rounded-md hover:bg-secondary/80 transition-colors"
-                title="Board settings"
-              >
-                <Settings className="size-4" />
-                <span>Settings</span>
-              </button>
-
-              {boards.length > 1 && (
-                <button
-                  type="button"
-                  onClick={onDeleteBoardClick}
-                  className="h-9 w-9 flex items-center justify-center text-destructive border border-input rounded-md hover:bg-destructive/10 transition-colors"
-                  title="Delete active board"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              onClick={onSettingsClick}
+              className="h-9 px-3 flex items-center gap-1.5 bg-secondary text-secondary-foreground border border-input text-sm font-medium rounded-md hover:bg-secondary/80 transition-colors"
+              title="Board settings"
+            >
+              <Settings className="size-4" />
+              <span>Settings</span>
+            </button>
           )}
 
           <button
@@ -126,7 +110,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
       <div className="flex flex-wrap items-center gap-3 pt-2">
         {/* Search Text */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search by title, description or KEY-123..."

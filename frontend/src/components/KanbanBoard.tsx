@@ -11,12 +11,15 @@ interface KanbanBoardProps {
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
-  columns,
-  tasks,
+  columns: rawColumns,
+  tasks: rawTasks,
   allStatuses,
   onStatusChange,
   onCardClick,
 }) => {
+  const columns = Array.isArray(rawColumns) ? rawColumns : [];
+  const tasks = Array.isArray(rawTasks) ? rawTasks : [];
+
   const normalize = (str?: string) => (str || "").toLowerCase().replace(/[\s_-]/g, "");
 
   const isTaskInColumn = (t: CrossProjectTask, col: ColumnConfig): boolean => {
@@ -26,7 +29,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (col.status_categories && col.status_categories.length > 0) {
       const catMatch = col.status_categories.some((c) => {
         const normC = normalize(c);
-        return normC === taskCat || (taskCat !== "" && normC.includes(taskCat));
+        if (!normC || !taskCat) return normC === taskCat;
+        return normC === taskCat || normC.includes(taskCat) || taskCat.includes(normC);
       });
       if (catMatch) return true;
     }

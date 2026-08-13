@@ -130,7 +130,6 @@ function Content({ api, ui }: ViewExtensionProps) {
         onSelectBoard={setActiveBoardId}
         onCreateBoardClick={handleCreateBoard}
         onSettingsClick={() => setIsSettingsOpen(true)}
-        onDeleteBoardClick={handleDeleteBoard}
         onFilterChange={setFilters}
         onRefresh={() => refetch()}
         isFetching={isFetching}
@@ -159,6 +158,7 @@ function Content({ api, ui }: ViewExtensionProps) {
         projects={projects}
         statuses={statuses}
         onSave={handleSaveSettings}
+        onDelete={handleDeleteBoard}
         isSaving={updateMutation.isPending}
       />
     </div>

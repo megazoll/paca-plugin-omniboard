@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	plugin "github.com/Paca-AI/plugin-sdk-go"
@@ -78,20 +79,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 	// Build SQL query for tasks
 	sqlParts := []string{
-		`SELECT 
-			t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix,
-			t.task_number, t.title, COALESCE(t.description, '') AS description,
-			t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category,
-			COALESCE(ts.color, '#64748b') AS status_color,
-			t.assignee_id, COALESCE(u.full_name, u.username, '') AS assignee_name,
-			COALESCE(t.priority, 'medium') AS priority,
-			t.created_at, t.updated_at
-		FROM tasks t
-		JOIN projects p ON t.project_id = p.id
-		LEFT JOIN task_statuses ts ON t.status_id = ts.id
-		LEFT JOIN project_members pm ON t.assignee_id = pm.id
-		LEFT JOIN users u ON pm.user_id = u.id OR t.assignee_id = u.id
-		WHERE 1=1`,
+		`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, t.assignee_id, COALESCE(u.full_name, u.username, u_pm.full_name, u_pm.username, '') AS assignee_name, COALESCE(t.priority, 'medium') AS priority, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id LEFT JOIN users u ON t.assignee_id = u.id LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id WHERE id IS NOT NULL`,
 	}
 
 	args := []any{}
@@ -140,8 +128,6 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		argIdx++
 	}
 
-	sqlParts = append(sqlParts, "ORDER BY t.updated_at DESC LIMIT 500")
-
 	fullSQL := strings.Join(sqlParts, " ")
 	taskRows, err := p.db.Query(fullSQL, args...)
 	if err != nil {
@@ -173,6 +159,10 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			})
 		}
 	}
+
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].UpdatedAt > tasks[j].UpdatedAt
+	})
 
 	ok(res, tasks)
 }

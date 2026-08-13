@@ -94,6 +94,8 @@ func (s *scanner) str(col string) string {
 			return ""
 		}
 		return *v
+	case []byte:
+		return string(v)
 	default:
 		return fmt.Sprintf("%v", s.row[i])
 	}

@@ -131,7 +131,6 @@ function Content({ api, ui }: AdminPageProps) {
         onSelectBoard={setActiveBoardId}
         onCreateBoardClick={handleCreateBoard}
         onSettingsClick={() => setIsSettingsOpen(true)}
-        onDeleteBoardClick={handleDeleteBoard}
         onFilterChange={setFilters}
         onRefresh={() => refetch()}
         isFetching={isFetching}
@@ -160,6 +159,7 @@ function Content({ api, ui }: AdminPageProps) {
         projects={projects}
         statuses={statuses}
         onSave={handleSaveSettings}
+        onDelete={handleDeleteBoard}
         isSaving={updateMutation.isPending}
       />
     </div>

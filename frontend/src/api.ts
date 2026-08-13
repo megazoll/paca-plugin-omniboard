@@ -40,13 +40,21 @@ function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: 
   return `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
 }
 
+async function unwrapData<T>(promise: Promise<any>): Promise<T> {
+  const res = await promise;
+  if (res && typeof res === "object" && "data" in res && res.data !== undefined) {
+    return res.data as T;
+  }
+  return res as T;
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export function useOmniboards(api: PluginApiClient, scope: OmniboardScope = "project") {
   const path = getBasePath(api, scope);
   return useQuery<Omniboard[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "boards", scope, api.projectId],
-    queryFn: () => api.pluginGet<Omniboard[]>(PLUGIN_ID, path),
+    queryFn: () => unwrapData<Omniboard[]>(api.pluginGet(PLUGIN_ID, path)),
     staleTime: 10 * 1000,
   });
 }
@@ -55,7 +63,7 @@ export function useOmniboard(api: PluginApiClient, boardId: string, scope: Omnib
   const basePath = getBasePath(api, scope);
   return useQuery<Omniboard, Error>({
     queryKey: ["plugin", PLUGIN_ID, "board", scope, boardId],
-    queryFn: () => api.pluginGet<Omniboard>(PLUGIN_ID, `${basePath}/${boardId}`),
+    queryFn: () => unwrapData<Omniboard>(api.pluginGet(PLUGIN_ID, `${basePath}/${boardId}`)),
     enabled: !!boardId,
     staleTime: 10 * 1000,
   });
@@ -65,7 +73,7 @@ export function useOmniboardProjects(api: PluginApiClient, scope: OmniboardScope
   const path = getProjectsPath(api, scope);
   return useQuery<ProjectInfo[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "projects", scope],
-    queryFn: () => api.pluginGet<ProjectInfo[]>(PLUGIN_ID, path),
+    queryFn: () => unwrapData<ProjectInfo[]>(api.pluginGet(PLUGIN_ID, path)),
     staleTime: 60 * 1000,
   });
 }
@@ -74,7 +82,7 @@ export function useOmniboardStatuses(api: PluginApiClient, scope: OmniboardScope
   const path = getStatusesPath(api, scope);
   return useQuery<StatusInfo[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "statuses", scope],
-    queryFn: () => api.pluginGet<StatusInfo[]>(PLUGIN_ID, path),
+    queryFn: () => unwrapData<StatusInfo[]>(api.pluginGet(PLUGIN_ID, path)),
     staleTime: 60 * 1000,
   });
 }
@@ -97,7 +105,7 @@ export function useOmniboardTasks(
 
   return useQuery<CrossProjectTask[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "tasks", scope, boardId, filters],
-    queryFn: () => api.pluginGet<CrossProjectTask[]>(PLUGIN_ID, path),
+    queryFn: () => unwrapData<CrossProjectTask[]>(api.pluginGet(PLUGIN_ID, path)),
     enabled: !!boardId,
     refetchInterval: 15 * 1000, // auto-refresh board tasks every 15s
   });
@@ -114,7 +122,7 @@ export function useCreateOmniboard(api: PluginApiClient, scope: OmniboardScope =
   const invalidate = useInvalidateOmniboards(api);
   const path = getBasePath(api, scope);
   return useMutation({
-    mutationFn: (input: CreateOmniboardInput) => api.pluginPost<Omniboard>(PLUGIN_ID, path, input),
+    mutationFn: (input: CreateOmniboardInput) => unwrapData<Omniboard>(api.pluginPost(PLUGIN_ID, path, input)),
     onSuccess: invalidate,
   });
 }
@@ -124,7 +132,7 @@ export function useUpdateOmniboard(api: PluginApiClient, scope: OmniboardScope =
   const basePath = getBasePath(api, scope);
   return useMutation({
     mutationFn: ({ boardId, input }: { boardId: string; input: UpdateOmniboardInput }) =>
-      api.pluginPatch<Omniboard>(PLUGIN_ID, `${basePath}/${boardId}`, input),
+      unwrapData<Omniboard>(api.pluginPatch(PLUGIN_ID, `${basePath}/${boardId}`, input)),
     onSuccess: invalidate,
   });
 }
@@ -133,7 +141,7 @@ export function useDeleteOmniboard(api: PluginApiClient, scope: OmniboardScope =
   const invalidate = useInvalidateOmniboards(api);
   const basePath = getBasePath(api, scope);
   return useMutation({
-    mutationFn: (boardId: string) => api.pluginDelete(PLUGIN_ID, `${basePath}/${boardId}`),
+    mutationFn: (boardId: string) => unwrapData<any>(api.pluginDelete(PLUGIN_ID, `${basePath}/${boardId}`)),
     onSuccess: invalidate,
   });
 }
@@ -142,7 +150,7 @@ export function useUpdateTaskStatus(api: PluginApiClient, scope: OmniboardScope 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
-      api.pluginPatch(PLUGIN_ID, getTaskStatusPath(api, scope, taskId), { status_id: statusId }),
+      unwrapData<any>(api.pluginPatch(PLUGIN_ID, getTaskStatusPath(api, scope, taskId), { status_id: statusId })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
     },
