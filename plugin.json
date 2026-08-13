@@ -1,8 +1,8 @@
 {
-  "id": "com.paca.dashboard",
-  "displayName": "Dashboard",
-  "description": "Customizable panel-based dashboard builder (charts, tables, text) across the project dashboard page, the admin dashboard page, and a single dashboard per Integration-page view (backlog/sprint/timeline).",
-  "version": "0.3.1",
+  "id": "com.paca.omniboard",
+  "displayName": "Omniboard",
+  "description": "Multi-project Kanban board plugin for PACA AI to view, filter, and manage tasks across multiple projects.",
+  "version": "0.1.0",
   "minCoreVersion": "v0.11.2",
   "permissions": ["db.read", "db.write", "events.subscribe", "cache"],
   "backend": {
@@ -10,25 +10,7 @@
     "routes": [
       {
         "method": "GET",
-        "path": "/projects/:projectId/dashboard/view",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
-        ]
-      },
-      {
-        "method": "GET",
-        "path": "/projects/:projectId/dashboard/view/:hostViewId",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
-        ]
-      },
-      {
-        "method": "GET",
-        "path": "/projects/:projectId/dashboard/views/:viewId",
+        "path": "/projects/:projectId/omniboard/boards",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -37,7 +19,7 @@
       },
       {
         "method": "POST",
-        "path": "/projects/:projectId/dashboard/views/:viewId/panels",
+        "path": "/projects/:projectId/omniboard/boards",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -45,8 +27,17 @@
         ]
       },
       {
+        "method": "GET",
+        "path": "/projects/:projectId/omniboard/boards/:boardId",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+        ]
+      },
+      {
         "method": "PATCH",
-        "path": "/projects/:projectId/dashboard/views/:viewId/panels/:panelId",
+        "path": "/projects/:projectId/omniboard/boards/:boardId",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -55,34 +46,7 @@
       },
       {
         "method": "DELETE",
-        "path": "/projects/:projectId/dashboard/views/:viewId/panels/:panelId",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
-        ]
-      },
-      {
-        "method": "PATCH",
-        "path": "/projects/:projectId/dashboard/views/:viewId/panels/layout",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
-        ]
-      },
-      {
-        "method": "POST",
-        "path": "/projects/:projectId/dashboard/views/:viewId/panels/:panelId/data",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
-        ]
-      },
-      {
-        "method": "POST",
-        "path": "/projects/:projectId/dashboard/query/preview",
+        "path": "/projects/:projectId/omniboard/boards/:boardId",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -91,7 +55,43 @@
       },
       {
         "method": "GET",
-        "path": "/dashboard/admin-view",
+        "path": "/projects/:projectId/omniboard/projects",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/omniboard/statuses",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/omniboard/boards/:boardId/tasks",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+        ]
+      },
+      {
+        "method": "PATCH",
+        "path": "/projects/:projectId/omniboard/tasks/:taskId/status",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/omniboard/admin-boards",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -100,7 +100,7 @@
       },
       {
         "method": "POST",
-        "path": "/dashboard/admin-view/panels",
+        "path": "/omniboard/admin-boards",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -109,7 +109,7 @@
       },
       {
         "method": "PATCH",
-        "path": "/dashboard/admin-view/panels/:panelId",
+        "path": "/omniboard/admin-boards/:boardId",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -118,7 +118,34 @@
       },
       {
         "method": "DELETE",
-        "path": "/dashboard/admin-view/panels/:panelId",
+        "path": "/omniboard/admin-boards/:boardId",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/omniboard/admin-projects",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/omniboard/admin-statuses",
+        "middlewares": [
+          { "name": "optionalAuthn" },
+          { "name": "requireFreshPassword" },
+          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/omniboard/admin-boards/:boardId/tasks",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -127,25 +154,7 @@
       },
       {
         "method": "PATCH",
-        "path": "/dashboard/admin-view/panels/layout",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
-        ]
-      },
-      {
-        "method": "POST",
-        "path": "/dashboard/admin-view/panels/:panelId/data",
-        "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
-        ]
-      },
-      {
-        "method": "POST",
-        "path": "/dashboard/admin-query/preview",
+        "path": "/omniboard/admin-tasks/:taskId/status",
         "middlewares": [
           { "name": "optionalAuthn" },
           { "name": "requireFreshPassword" },
@@ -155,49 +164,49 @@
     ]
   },
   "frontend": {
-    "remoteEntryUrl": "/plugins/com.paca.dashboard/assets/remoteEntry.js",
+    "remoteEntryUrl": "/plugins/com.paca.omniboard/assets/remoteEntry.js",
     "extensionPoints": [
       {
         "point": "project.page",
-        "component": "ProjectDashboardPage",
+        "component": "ProjectOmniboardPage",
         "order": 5
       },
       {
         "point": "admin.page",
-        "component": "AdminDashboardPage",
+        "component": "AdminOmniboardPage",
         "order": 5
       },
       {
         "point": "view",
-        "component": "DashboardIntegrationView",
-        "label": "Dashboard",
+        "component": "OmniboardIntegrationView",
+        "label": "Omniboard",
         "order": 5
       }
     ],
     "navItems": [
       {
         "scope": "project",
-        "slug": "dashboard",
-        "label": "Dashboard",
-        "icon": "LayoutDashboard",
-        "component": "ProjectDashboardPage",
+        "slug": "omniboard",
+        "label": "Omniboard",
+        "icon": "Kanban",
+        "component": "ProjectOmniboardPage",
         "order": 5
       },
       {
         "scope": "admin",
-        "slug": "dashboard",
-        "label": "Dashboard",
-        "icon": "LayoutDashboard",
-        "component": "AdminDashboardPage",
+        "slug": "omniboard",
+        "label": "Omniboard",
+        "icon": "Kanban",
+        "component": "AdminOmniboardPage",
         "order": 5
       }
     ]
   },
   "mcp": {
-    "remoteEntryUrl": "/plugins-mcp/com.paca.dashboard/mcp.js"
+    "remoteEntryUrl": "/plugins-mcp/com.paca.omniboard/mcp.js"
   },
   "skills": {
-    "baseUrl": "/plugins-skills/com.paca.dashboard",
-    "names": ["paca-dashboard-builder"]
+    "baseUrl": "/plugins-skills/com.paca.omniboard",
+    "names": ["paca-omniboard"]
   }
 }

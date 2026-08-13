@@ -1,1 +1,1 @@
-export const PLUGIN_ID = "com.paca.dashboard";
+export const PLUGIN_ID = "com.paca.omniboard";

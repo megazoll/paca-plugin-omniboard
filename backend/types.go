@@ -4,54 +4,69 @@ import "fmt"
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
-// dashboardPanel is one chart/table/text panel within a dashboard view.
-type dashboardPanel struct {
-	ID          string         `json:"id"`
-	DashboardID string         `json:"dashboard_view_id"`
-	Type        string         `json:"type"` // "chart" | "table" | "text"
-	Title       string         `json:"title"`
-	Query       *string        `json:"query,omitempty"`      // chart/table only
-	ChartType   *string        `json:"chart_type,omitempty"` // chart only: "bar" | "line" | "donut"
-	Content     *string        `json:"content,omitempty"`    // text only
-	VizConfig   map[string]any `json:"viz_config"`
-	PosX        int            `json:"pos_x"`
-	PosY        int            `json:"pos_y"`
-	Width       int            `json:"width"`
-	Height      int            `json:"height"`
-	CreatedAt   string         `json:"created_at"`
-	UpdatedAt   string         `json:"updated_at"`
+// Omniboard represents a multi-project Kanban board configuration.
+type Omniboard struct {
+	ID          string           `json:"id"`
+	ProjectID   *string          `json:"project_id,omitempty"`
+	Scope       string           `json:"scope"` // "project" | "admin" | "integration"
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	ProjectIDs  []string         `json:"project_ids"`   // list of project UUIDs, empty = all
+	ColumnConfig []ColumnConfig `json:"column_config"` // list of columns & status mappings
+	Filters     map[string]any   `json:"filters"`       // saved filters
+	CreatedAt   string           `json:"created_at"`
+	UpdatedAt   string           `json:"updated_at"`
 }
 
-// dashboardView is one dashboard (project/admin/integration scope) with its
-// panels embedded.
-type dashboardView struct {
-	ID         string           `json:"id"`
-	ProjectID  *string          `json:"project_id,omitempty"`
-	Scope      string           `json:"scope"` // "project" | "admin" | "integration"
-	// HostViewID is set only for scope="integration": the id of the host's
-	// own interaction-view row (a "Dashboard"-type view in Backlog/Sprint/
-	// Timeline) this dashboard belongs to — exactly one dashboard per host
-	// view, enforced by uq_dashboard_views_one_per_host_view.
-	HostViewID *string          `json:"host_view_id,omitempty"`
-	Name       string           `json:"name"`
-	Panels     []dashboardPanel `json:"panels"`
-	CreatedAt  string           `json:"created_at"`
-	UpdatedAt  string           `json:"updated_at"`
+// ColumnConfig represents a single column on the Kanban board.
+type ColumnConfig struct {
+	ID               string   `json:"id"`
+	Title            string   `json:"title"`
+	StatusCategories []string `json:"status_categories,omitempty"` // e.g. ["todo"], ["inprogress"]
+	StatusNames      []string `json:"status_names,omitempty"`      // e.g. ["In Review"]
+	Color            string   `json:"color,omitempty"`
 }
 
-// panelLayoutEntry is one row of a bulk drag/resize layout update.
-type panelLayoutEntry struct {
-	ID     string `json:"id"`
-	PosX   int    `json:"pos_x"`
-	PosY   int    `json:"pos_y"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+// CrossProjectTask represents a task with attached project & status metadata.
+type CrossProjectTask struct {
+	ID             string  `json:"id"`
+	ProjectID      string  `json:"project_id"`
+	ProjectName    string  `json:"project_name"`
+	ProjectPrefix  string  `json:"project_prefix"`
+	TaskNumber     int     `json:"task_number"`
+	Title          string  `json:"title"`
+	Description    string  `json:"description"`
+	StatusID       *string `json:"status_id"`
+	StatusName     string  `json:"status_name"`
+	StatusCategory string  `json:"status_category"`
+	StatusColor    string  `json:"status_color"`
+	AssigneeID     *string `json:"assignee_id"`
+	AssigneeName   string  `json:"assignee_name"`
+	Priority       string  `json:"priority"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+}
+
+// ProjectItem summary for UI dropdowns.
+type ProjectItem struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	TaskIDPrefix string `json:"task_id_prefix"`
+}
+
+// StatusItem summary for UI status configuration.
+type StatusItem struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	Name      string `json:"name"`
+	Color     string `json:"color"`
+	Category  string `json:"category"`
+	Position  int    `json:"position"`
+	IsDefault bool   `json:"is_default"`
 }
 
 // ── Row scanner helper ────────────────────────────────────────────────────────
-// Mirrors the pattern used by the checklist and time-logging plugins: a tiny
-// column-name-indexed accessor over a plugin.DBQueryResult row, since the
-// host bridge returns rows as untyped []any rather than a typed scanner.
 
 type scanner struct {
 	idx map[string]int
@@ -110,13 +125,20 @@ func (s *scanner) intVal(col string) int {
 	}
 }
 
-func (s *scanner) objVal(col string) map[string]any {
+func (s *scanner) boolVal(col string) bool {
 	i, ok := s.idx[col]
 	if !ok || i >= len(s.row) || s.row[i] == nil {
-		return map[string]any{}
+		return false
 	}
-	if v, ok := s.row[i].(map[string]any); ok {
+	switch v := s.row[i].(type) {
+	case bool:
 		return v
+	case *bool:
+		if v == nil {
+			return false
+		}
+		return *v
+	default:
+		return false
 	}
-	return map[string]any{}
 }

@@ -1,12 +1,12 @@
 {
-  "name": "@paca-ai/dashboard-plugin-mcp",
+  "name": "@paca-ai/omniboard-plugin-mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite build --watch",
-    "typecheck": "tsc --noEmit"
+    "build": "bun run vite build",
+    "dev": "bun run vite build --watch",
+    "typecheck": "bun run tsc --noEmit"
   },
   "dependencies": {
     "@paca-ai/plugin-sdk-mcp": "^0.1.0"

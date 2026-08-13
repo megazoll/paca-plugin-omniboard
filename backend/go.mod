@@ -1,4 +1,4 @@
-module github.com/Paca-AI/first-party/dashboard
+module github.com/Paca-AI/first-party/omniboard
 
 go 1.24
 

@@ -1,74 +1,82 @@
-/**
- * types.ts — response shapes for the dashboard plugin's panel-based
- * dashboard builder. Mirrors the backend's dashboardView/dashboardPanel JSON
- * encodings (see backend/types.go, views.go, panels.go) field for field.
- */
+export type OmniboardScope = "project" | "admin" | "integration";
 
-export type DashboardScopeKind = "project" | "admin" | "integration";
-
-export type PanelType = "chart" | "table" | "text";
-export type ChartType = "bar" | "line" | "donut";
-
-export interface DashboardPanel {
+export interface ColumnConfig {
   id: string;
-  dashboard_view_id: string;
-  type: PanelType;
   title: string;
-  query?: string | null;
-  chart_type?: ChartType | null;
-  content?: string | null;
-  viz_config: Record<string, unknown>;
-  pos_x: number;
-  pos_y: number;
-  width: number;
-  height: number;
-  created_at: string;
-  updated_at: string;
+  status_categories?: string[];
+  status_names?: string[];
+  color?: string;
 }
 
-export interface DashboardView {
+export interface BoardFilters {
+  search?: string;
+  projectId?: string;
+  assigneeId?: string;
+  priority?: string;
+}
+
+export interface Omniboard {
   id: string;
-  project_id?: string | null;
-  scope: DashboardScopeKind;
-  /** Set only for scope="integration": the host's own interaction-view id
-   * this dashboard is a singleton for. See backend/types.go. */
-  host_view_id?: string | null;
+  project_id?: string;
+  scope: OmniboardScope;
   name: string;
-  panels: DashboardPanel[];
+  description: string;
+  project_ids: string[];
+  column_config: ColumnConfig[];
+  filters: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
 
-/** Body sent when creating/updating a panel. */
-export interface PanelInput {
-  type: PanelType;
-  title: string;
-  query?: string | null;
-  chart_type?: ChartType | null;
-  content?: string | null;
-  viz_config?: Record<string, unknown>;
-  pos_x?: number;
-  pos_y?: number;
-  width?: number;
-  height?: number;
+export interface CreateOmniboardInput {
+  name: string;
+  description?: string;
+  project_ids?: string[];
+  column_config?: ColumnConfig[];
+  filters?: Record<string, any>;
+  scope?: OmniboardScope;
 }
 
-/** One row of a bulk drag/resize layout commit. */
-export interface PanelLayoutEntry {
+export interface UpdateOmniboardInput {
+  name?: string;
+  description?: string;
+  project_ids?: string[];
+  column_config?: ColumnConfig[];
+  filters?: Record<string, any>;
+}
+
+export interface CrossProjectTask {
   id: string;
-  pos_x: number;
-  pos_y: number;
-  width: number;
-  height: number;
+  project_id: string;
+  project_name: string;
+  project_prefix: string;
+  task_number: number;
+  title: string;
+  description: string;
+  status_id: string | null;
+  status_name: string;
+  status_category: string;
+  status_color: string;
+  assignee_id: string | null;
+  assignee_name: string;
+  priority: string;
+  created_at: string;
+  updated_at: string;
 }
 
-/** Response shape of the panel-data / query-preview endpoints. */
-export interface QueryResult {
-  columns: string[];
-  rows: Record<string, unknown>[];
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  description: string;
+  task_id_prefix: string;
 }
 
-/** A structured error surfaced by the backend query guard (400 body). */
-export interface QueryGuardError {
-  message: string;
+export interface StatusInfo {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  category: string;
+  position: number;
+  is_default: boolean;
 }

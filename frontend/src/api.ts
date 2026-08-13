@@ -1,160 +1,146 @@
-/**
- * api.ts — data-fetching hooks and mutations for the panel-based dashboard
- * builder, shared across the project/admin pages and the Integration-page
- * dashboard views. Kept separate from the page/component files so the
- * fetch layer (query keys, endpoint paths) is easy to find independently
- * of rendering — same split used by the time-logging plugin.
- *
- * Endpoint map (see backend/plugin.go for the full route table):
- *   GET    /dashboard/view                              — project singleton
- *   GET    /dashboard/admin-view                         — admin singleton
- *   GET    /dashboard/view/:hostViewId                   — integration singleton (one per host view)
- *   GET    /dashboard/views/:viewId                      — any scope, by resolved dashboard id
- *   POST   /dashboard/views/:viewId/panels                (or /admin-view/panels)
- *   PATCH  /dashboard/views/:viewId/panels/:panelId
- *   DELETE /dashboard/views/:viewId/panels/:panelId
- *   PATCH  /dashboard/views/:viewId/panels/layout
- *   POST   /dashboard/views/:viewId/panels/:panelId/data
- *   POST   /dashboard/query/preview (or /dashboard/admin-query/preview)
- */
-
 import type { PluginApiClient } from "@paca-ai/plugin-sdk-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
 import { PLUGIN_ID } from "./constants";
 import type {
-  DashboardScopeKind,
-  DashboardView,
-  PanelInput,
-  PanelLayoutEntry,
-  QueryResult,
+  BoardFilters,
+  CreateOmniboardInput,
+  CrossProjectTask,
+  Omniboard,
+  OmniboardScope,
+  ProjectInfo,
+  StatusInfo,
+  UpdateOmniboardInput,
 } from "./types";
 
-/** Resolves the view-scoped base path for panel/layout/data routes. Project
- * and integration scopes must go through the host's `/projects/:projectId`
- * prefix — PluginApiClient does not inject it automatically, see
- * api-client.ts's pluginGet doc comment. Admin scope has no project. */
-function viewBasePath(api: PluginApiClient, scope: DashboardScopeKind, viewId: string): string {
+function getBasePath(api: PluginApiClient, scope: OmniboardScope): string {
   return scope === "admin"
-    ? "/dashboard/admin-view"
-    : `/projects/${api.projectId}/dashboard/views/${viewId}`;
+    ? "/omniboard/admin-boards"
+    : `/projects/${api.projectId}/omniboard/boards`;
 }
 
-function previewPath(api: PluginApiClient, scope: DashboardScopeKind): string {
+function getProjectsPath(api: PluginApiClient, scope: OmniboardScope): string {
   return scope === "admin"
-    ? "/dashboard/admin-query/preview"
-    : `/projects/${api.projectId}/dashboard/query/preview`;
+    ? "/omniboard/admin-projects"
+    : `/projects/${api.projectId}/omniboard/projects`;
+}
+
+function getStatusesPath(api: PluginApiClient, scope: OmniboardScope): string {
+  return scope === "admin"
+    ? "/omniboard/admin-statuses"
+    : `/projects/${api.projectId}/omniboard/statuses`;
+}
+
+function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
+  return scope === "admin"
+    ? `/omniboard/admin-tasks/${taskId}/status`
+    : `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
-export function useProjectDashboardView(api: PluginApiClient) {
-  return useQuery<DashboardView, Error>({
-    queryKey: ["plugin", PLUGIN_ID, "view", "project"],
-    queryFn: () => api.pluginGet<DashboardView>(PLUGIN_ID, `/projects/${api.projectId}/dashboard/view`),
+export function useOmniboards(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const path = getBasePath(api, scope);
+  return useQuery<Omniboard[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "boards", scope, api.projectId],
+    queryFn: () => api.pluginGet<Omniboard[]>(PLUGIN_ID, path),
     staleTime: 10 * 1000,
   });
 }
 
-export function useAdminDashboardView(api: PluginApiClient) {
-  return useQuery<DashboardView, Error>({
-    queryKey: ["plugin", PLUGIN_ID, "view", "admin"],
-    queryFn: () => api.pluginGet<DashboardView>(PLUGIN_ID, "/dashboard/admin-view"),
+export function useOmniboard(api: PluginApiClient, boardId: string, scope: OmniboardScope = "project") {
+  const basePath = getBasePath(api, scope);
+  return useQuery<Omniboard, Error>({
+    queryKey: ["plugin", PLUGIN_ID, "board", scope, boardId],
+    queryFn: () => api.pluginGet<Omniboard>(PLUGIN_ID, `${basePath}/${boardId}`),
+    enabled: !!boardId,
     staleTime: 10 * 1000,
   });
 }
 
-/** Get-or-creates the single dashboard belonging to one host interaction
- * view (a "Dashboard"-type view in Backlog/Sprint/Timeline) — hostViewId is
- * the host's own view record id (ViewExtensionProps.viewId), not a
- * plugin-managed id. Exactly one dashboard per host view. */
-export function useIntegrationDashboardView(api: PluginApiClient, hostViewId: string) {
-  return useQuery<DashboardView, Error>({
-    queryKey: ["plugin", PLUGIN_ID, "view", "integration", hostViewId],
-    queryFn: () =>
-      api.pluginGet<DashboardView>(PLUGIN_ID, `/projects/${api.projectId}/dashboard/view/${hostViewId}`),
-    enabled: !!hostViewId,
-    staleTime: 10 * 1000,
+export function useOmniboardProjects(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const path = getProjectsPath(api, scope);
+  return useQuery<ProjectInfo[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "projects", scope],
+    queryFn: () => api.pluginGet<ProjectInfo[]>(PLUGIN_ID, path),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOmniboardStatuses(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const path = getStatusesPath(api, scope);
+  return useQuery<StatusInfo[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "statuses", scope],
+    queryFn: () => api.pluginGet<StatusInfo[]>(PLUGIN_ID, path),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOmniboardTasks(
+  api: PluginApiClient,
+  boardId: string,
+  filters: BoardFilters = {},
+  scope: OmniboardScope = "project"
+) {
+  const basePath = getBasePath(api, scope);
+  const queryParams = new URLSearchParams();
+  if (filters.search) queryParams.set("search", filters.search);
+  if (filters.projectId) queryParams.set("projectId", filters.projectId);
+  if (filters.assigneeId) queryParams.set("assigneeId", filters.assigneeId);
+  if (filters.priority) queryParams.set("priority", filters.priority);
+
+  const queryString = queryParams.toString();
+  const path = `${basePath}/${boardId}/tasks${queryString ? `?${queryString}` : ""}`;
+
+  return useQuery<CrossProjectTask[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "tasks", scope, boardId, filters],
+    queryFn: () => api.pluginGet<CrossProjectTask[]>(PLUGIN_ID, path),
+    enabled: !!boardId,
+    refetchInterval: 15 * 1000, // auto-refresh board tasks every 15s
   });
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-/** Invalidates every cached view/list query — simplest-correct approach given
- * the small query surface here (no need for granular per-view invalidation). */
-function useInvalidateDashboards(api: PluginApiClient) {
+function useInvalidateOmniboards(api: PluginApiClient) {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID] });
 }
 
-export function useCreatePanel(api: PluginApiClient, scope: DashboardScopeKind, viewId: string) {
-  const invalidate = useInvalidateDashboards(api);
-  const base = viewBasePath(api, scope, viewId);
+export function useCreateOmniboard(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const invalidate = useInvalidateOmniboards(api);
+  const path = getBasePath(api, scope);
   return useMutation({
-    mutationFn: (panel: PanelInput) => api.pluginPost(PLUGIN_ID, `${base}/panels`, panel),
+    mutationFn: (input: CreateOmniboardInput) => api.pluginPost<Omniboard>(PLUGIN_ID, path, input),
     onSuccess: invalidate,
   });
 }
 
-export function useUpdatePanel(api: PluginApiClient, scope: DashboardScopeKind, viewId: string) {
-  const invalidate = useInvalidateDashboards(api);
-  const base = viewBasePath(api, scope, viewId);
+export function useUpdateOmniboard(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const invalidate = useInvalidateOmniboards(api);
+  const basePath = getBasePath(api, scope);
   return useMutation({
-    mutationFn: ({ panelId, panel }: { panelId: string; panel: PanelInput }) =>
-      api.pluginPatch(PLUGIN_ID, `${base}/panels/${panelId}`, panel),
+    mutationFn: ({ boardId, input }: { boardId: string; input: UpdateOmniboardInput }) =>
+      api.pluginPatch<Omniboard>(PLUGIN_ID, `${basePath}/${boardId}`, input),
     onSuccess: invalidate,
   });
 }
 
-export function useDeletePanel(api: PluginApiClient, scope: DashboardScopeKind, viewId: string) {
-  const invalidate = useInvalidateDashboards(api);
-  const base = viewBasePath(api, scope, viewId);
+export function useDeleteOmniboard(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const invalidate = useInvalidateOmniboards(api);
+  const basePath = getBasePath(api, scope);
   return useMutation({
-    mutationFn: (panelId: string) => api.pluginDelete(PLUGIN_ID, `${base}/panels/${panelId}`),
+    mutationFn: (boardId: string) => api.pluginDelete(PLUGIN_ID, `${basePath}/${boardId}`),
     onSuccess: invalidate,
   });
 }
 
-export function useUpdatePanelLayout(api: PluginApiClient, scope: DashboardScopeKind, viewId: string) {
-  const invalidate = useInvalidateDashboards(api);
-  const base = viewBasePath(api, scope, viewId);
+export function useUpdateTaskStatus(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (panels: PanelLayoutEntry[]) =>
-      api.pluginPatch(PLUGIN_ID, `${base}/panels/layout`, { panels }),
-    // Layout drags happen often; skip the full invalidate to avoid grid
-    // flicker mid-drag session — caller already holds optimistic local state.
-    onSuccess: () => {},
-  });
-}
-
-/** Plain fetcher, not a `useMutation` — callers (DashboardBody) fire this
- * once per panel concurrently on mount, and a single shared mutation
- * observer can only track one in-flight call's callbacks at a time. Firing
- * `.mutate()` for panel B before panel A settles detaches A's observer, so
- * A's onSuccess/onSettled never runs even though its request succeeds
- * (panel stuck on "Loading…"). A plain function per call has no shared
- * state to race on.
- *
- * `forceRefresh` bypasses the backend's panel-data cache (5-minute TTL) —
- * pass it for an explicit user action (the panel's reload button) so
- * clicking reload can't just hand back the same stale cached result;
- * mount-time auto-fetches omit it and are fine reading from cache. */
-export function usePanelDataFetcher(api: PluginApiClient, scope: DashboardScopeKind, viewId: string) {
-  const base = viewBasePath(api, scope, viewId);
-  return useCallback(
-    (panelId: string, forceRefresh = false) =>
-      api.pluginPost<QueryResult>(
-        PLUGIN_ID,
-        `${base}/panels/${panelId}/data${forceRefresh ? "?refresh=true" : ""}`,
-        {},
-      ),
-    [api, base],
-  );
-}
-
-export function useQueryPreview(api: PluginApiClient, scope: DashboardScopeKind) {
-  return useMutation({
-    mutationFn: (query: string) =>
-      api.pluginPost<QueryResult>(PLUGIN_ID, previewPath(api, scope), { query }),
+    mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
+      api.pluginPatch(PLUGIN_ID, getTaskStatusPath(api, scope, taskId), { status_id: statusId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
+    },
   });
 }
