@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   KanbanSquare,
   Plus,
@@ -6,6 +6,8 @@ import {
   Search,
   RefreshCw,
   Layers,
+  User,
+  X,
 } from "lucide-react";
 import type { BoardFilters, Omniboard, ProjectInfo } from "../types";
 
@@ -13,6 +15,7 @@ interface BoardHeaderProps {
   boards: Omniboard[];
   activeBoard: Omniboard | null;
   projects: ProjectInfo[];
+  assignees: { id: string; name: string }[];
   filters: BoardFilters;
   onSelectBoard: (boardId: string) => void;
   onCreateBoardClick: () => void;
@@ -26,6 +29,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
   boards,
   activeBoard,
   projects,
+  assignees,
   filters,
   onSelectBoard,
   onCreateBoardClick,
@@ -34,6 +38,19 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
   onRefresh,
   isFetching,
 }) => {
+  // Only display projects that are assigned to the current board
+  const boardProjects = useMemo(() => {
+    if (!activeBoard) return projects;
+    if (activeBoard.project_ids && activeBoard.project_ids.length > 0) {
+      return projects.filter((p) => activeBoard.project_ids.includes(p.id));
+    }
+    return projects;
+  }, [projects, activeBoard]);
+
+  const hasActiveFilters = Boolean(
+    filters.search || filters.projectId || filters.priority || filters.assigneeId
+  );
+
   return (
     <div className="flex flex-col shrink-0 border-b border-border/25 bg-background">
       {/* Top Title Row matching PACA InteractionLayout */}
@@ -97,31 +114,41 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
         </div>
       </div>
 
-      {/* Filter / Search Bar matching PACA View Tab sub-bar */}
-      <div className="flex items-center gap-3 border-t border-border/20 bg-muted/10 px-6 py-2">
-        {/* Search Input */}
-        <div className="relative flex items-center min-w-[200px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50 pointer-events-none" />
+      {/* Filter / Search Bar with generous spacing matching PACA system bar */}
+      <div className="flex flex-wrap items-center gap-3 border-t border-border/20 bg-muted/10 px-6 py-2.5">
+        {/* Search Input - Wider with comfortable height */}
+        <div className="relative flex items-center w-64 sm:w-80 md:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50 pointer-events-none" />
           <input
             type="text"
             placeholder="Search tasks..."
             value={filters.search || ""}
             onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            className="w-full h-7.5 pl-8 pr-3 text-xs bg-muted/25 border border-border/30 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/40 transition-all"
+            className="w-full h-8.5 pl-9 pr-8 text-xs bg-muted/25 border border-border/30 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
+          {filters.search && (
+            <button
+              type="button"
+              onClick={() => onFilterChange({ ...filters, search: "" })}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 size-4.5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+              title="Clear search"
+            >
+              <X className="size-3" />
+            </button>
+          )}
         </div>
 
-        {/* Project Filter */}
-        {projects.length > 0 && (
+        {/* Project Filter - only projects on this board */}
+        {boardProjects.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <Layers className="size-3.5 text-muted-foreground/50" />
+            <Layers className="size-3.5 text-muted-foreground/50 shrink-0" />
             <select
               value={filters.projectId || ""}
               onChange={(e) => onFilterChange({ ...filters, projectId: e.target.value || undefined })}
-              className="h-7.5 px-2 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
+              className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[200px] truncate"
             >
-              <option value="">All Projects</option>
-              {projects.map((p) => (
+              <option value="">All Projects ({boardProjects.length})</option>
+              {boardProjects.map((p) => (
                 <option key={p.id} value={p.id}>
                   [{p.task_id_prefix}] {p.name}
                 </option>
@@ -130,25 +157,44 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           </div>
         )}
 
+        {/* Assignee Filter */}
+        <div className="flex items-center gap-1.5">
+          <User className="size-3.5 text-muted-foreground/50 shrink-0" />
+          <select
+            value={filters.assigneeId || ""}
+            onChange={(e) => onFilterChange({ ...filters, assigneeId: e.target.value || undefined })}
+            className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[180px] truncate"
+          >
+            <option value="">All Assignees</option>
+            <option value="unassigned">Unassigned</option>
+            {assignees.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Priority Filter */}
         <select
           value={filters.priority || ""}
           onChange={(e) => onFilterChange({ ...filters, priority: e.target.value || undefined })}
-          className="h-7.5 px-2 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
+          className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
         >
           <option value="">All Priorities</option>
           <option value="urgent">Urgent</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
+          <option value="none">None</option>
         </select>
 
         {/* Clear Filters */}
-        {(filters.search || filters.projectId || filters.priority || filters.assigneeId) && (
+        {hasActiveFilters && (
           <button
             type="button"
             onClick={() => onFilterChange({})}
-            className="text-xs text-muted-foreground hover:text-foreground underline transition-colors ml-auto"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground underline transition-colors ml-auto"
           >
             Clear Filters
           </button>

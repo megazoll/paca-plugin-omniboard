@@ -93,13 +93,14 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	}
 
 	buildQuery := func(cfg queryConfig) (string, []any) {
-		prioritySelect := "COALESCE(t.priority, 'medium') AS priority"
+		prioritySelect := "COALESCE(t.priority, 'none') AS priority"
 		if cfg.useImportance {
 			prioritySelect = `CASE 
-				WHEN t.importance >= 3 THEN 'urgent' 
-				WHEN t.importance = 2 THEN 'high' 
-				WHEN t.importance = 1 THEN 'medium' 
-				ELSE 'low' 
+				WHEN t.importance >= 100 THEN 'urgent' 
+				WHEN t.importance >= 50 THEN 'high' 
+				WHEN t.importance >= 20 THEN 'medium' 
+				WHEN t.importance >= 1 THEN 'low' 
+				ELSE 'none' 
 			END AS priority`
 		}
 
@@ -165,23 +166,32 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		// Filter by assignee if provided in query params
 		filterAssignee := req.QueryParam("assigneeId")
 		if filterAssignee != "" {
-			switch cfg.assigneeStrategy {
-			case assigneeTaskAssigneesMember:
-				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.member_id = $%d)", argIdx))
-				args = append(args, filterAssignee)
-				argIdx++
-			case assigneeTaskAssigneesProjectMember:
-				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.project_member_id = $%d)", argIdx))
-				args = append(args, filterAssignee)
-				argIdx++
-			case assigneeTaskAssigneesUser:
-				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $%d)", argIdx))
-				args = append(args, filterAssignee)
-				argIdx++
-			case assigneeTasksAssigneeID:
-				sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
-				args = append(args, filterAssignee)
-				argIdx++
+			if filterAssignee == "unassigned" {
+				switch cfg.assigneeStrategy {
+				case assigneeTaskAssigneesMember, assigneeTaskAssigneesProjectMember, assigneeTaskAssigneesUser:
+					sqlParts = append(sqlParts, "AND NOT EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id)")
+				case assigneeTasksAssigneeID:
+					sqlParts = append(sqlParts, "AND t.assignee_id IS NULL")
+				}
+			} else {
+				switch cfg.assigneeStrategy {
+				case assigneeTaskAssigneesMember:
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.member_id = $%d)", argIdx))
+					args = append(args, filterAssignee)
+					argIdx++
+				case assigneeTaskAssigneesProjectMember:
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.project_member_id = $%d)", argIdx))
+					args = append(args, filterAssignee)
+					argIdx++
+				case assigneeTaskAssigneesUser:
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $%d)", argIdx))
+					args = append(args, filterAssignee)
+					argIdx++
+				case assigneeTasksAssigneeID:
+					sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
+					args = append(args, filterAssignee)
+					argIdx++
+				}
 			}
 		}
 
@@ -190,13 +200,15 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		if filterPriority != "" {
 			if cfg.useImportance {
 				switch strings.ToLower(filterPriority) {
-				case "urgent":
-					sqlParts = append(sqlParts, "AND t.importance >= 3")
+				case "urgent", "critical":
+					sqlParts = append(sqlParts, "AND t.importance >= 100")
 				case "high":
-					sqlParts = append(sqlParts, "AND t.importance = 2")
+					sqlParts = append(sqlParts, "AND (t.importance >= 50 AND t.importance < 100)")
 				case "medium":
-					sqlParts = append(sqlParts, "AND t.importance = 1")
+					sqlParts = append(sqlParts, "AND (t.importance >= 20 AND t.importance < 50)")
 				case "low":
+					sqlParts = append(sqlParts, "AND (t.importance >= 1 AND t.importance < 20)")
+				case "none":
 					sqlParts = append(sqlParts, "AND (t.importance <= 0 OR t.importance IS NULL)")
 				}
 			} else {

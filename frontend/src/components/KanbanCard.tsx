@@ -16,18 +16,21 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   onStatusChange,
   onCardClick,
 }) => {
-  const getPriorityMeta = (priority: string) => {
-    const p = (priority || "medium").toLowerCase();
+  const getPriorityMeta = (priority?: string) => {
+    const p = (priority || "").toLowerCase();
     switch (p) {
       case "urgent":
+      case "critical":
         return { color: "#ef4444", label: "Urgent" };
       case "high":
         return { color: "#f97316", label: "High" };
-      case "low":
-        return { color: "#64748b", label: "Low" };
       case "medium":
+        return { color: "#f59e0b", label: "Medium" };
+      case "low":
+        return { color: "#60a5fa", label: "Low" };
+      case "none":
       default:
-        return { color: "#3b82f6", label: "Medium" };
+        return null;
     }
   };
 
@@ -59,17 +62,19 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Field Chips (Priority + Assignee + Quick Status) */}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 pt-1">
         <div className="flex items-center gap-2">
-          {/* Priority indicator */}
-          <span
-            className="inline-flex items-center gap-1 text-xs font-medium shrink-0"
-            style={{ color: priorityMeta.color }}
-          >
+          {/* Priority indicator - only rendered if priority is not none */}
+          {priorityMeta && (
             <span
-              className="size-1.5 rounded-full shrink-0"
-              style={{ background: priorityMeta.color }}
-            />
-            {priorityMeta.label}
-          </span>
+              className="inline-flex items-center gap-1 text-xs font-medium shrink-0"
+              style={{ color: priorityMeta.color }}
+            >
+              <span
+                className="size-1.5 rounded-full shrink-0"
+                style={{ background: priorityMeta.color }}
+              />
+              {priorityMeta.label}
+            </span>
+          )}
 
           {/* Quick status dropdown */}
           <div onClick={(e) => e.stopPropagation()}>

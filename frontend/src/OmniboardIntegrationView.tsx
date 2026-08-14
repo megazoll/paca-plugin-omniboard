@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PluginQueryClientProvider } from "@paca-ai/plugin-sdk-react";
 import type { ViewExtensionProps } from "@paca-ai/plugin-sdk-react";
 import { BoardHeader } from "./components/BoardHeader";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { KanbanBoard } from "./components/KanbanBoard";
+import { TaskDetailModal } from "./components/TaskDetailModal";
 import {
   useOmniboards,
   useOmniboardTasks,
@@ -24,16 +25,26 @@ export default function OmniboardIntegrationView(props: ViewExtensionProps) {
   );
 }
 
-function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void }) {
-  const { api, ui, onTaskClick } = props;
+function Content(props: ViewExtensionProps) {
+  const { api, ui } = props;
   const scope = "integration";
   const { data: boards = [], isLoading: loadingBoards } = useOmniboards(api, scope);
   const { data: projects = [] } = useOmniboardProjects(api, scope);
   const { data: statuses = [] } = useOmniboardStatuses(api, scope);
 
-  const [activeBoardId, setActiveBoardId] = useState<string>("");
+  const getInitialBoardId = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("boardId") || "";
+    } catch {
+      return "";
+    }
+  };
+
+  const [activeBoardId, setActiveBoardId] = useState<string>(getInitialBoardId);
   const [filters, setFilters] = useState<BoardFilters>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<CrossProjectTask | null>(null);
 
   const activeBoard = useMemo<Omniboard | null>(() => {
     if (activeBoardId) {
@@ -45,11 +56,50 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
 
   const currentBoardId = activeBoard?.id || "";
 
+  const handleSelectBoard = (newBoardId: string) => {
+    setActiveBoardId(newBoardId);
+    try {
+      const url = new URL(window.location.href);
+      if (newBoardId) {
+        url.searchParams.set("boardId", newBoardId);
+      } else {
+        url.searchParams.delete("boardId");
+      }
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      // Ignore
+    }
+  };
+
+  useEffect(() => {
+    if (currentBoardId) {
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("boardId") !== currentBoardId) {
+          url.searchParams.set("boardId", currentBoardId);
+          window.history.replaceState(null, "", url.toString());
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  }, [currentBoardId]);
+
   const {
     data: tasks = [],
     isFetching,
     refetch,
   } = useOmniboardTasks(api, currentBoardId, filters, scope);
+
+  const assignees = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.assignee_id && t.assignee_name) {
+        map.set(t.assignee_id, t.assignee_name);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [tasks]);
 
   const createMutation = useCreateOmniboard(api, scope);
   const updateMutation = useUpdateOmniboard(api, scope);
@@ -61,7 +111,7 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
       { name: "New Integration Omniboard", scope },
       {
         onSuccess: (newBoard) => {
-          setActiveBoardId(newBoard.id);
+          handleSelectBoard(newBoard.id);
           setIsSettingsOpen(true);
           ui?.toast({ title: "Created new view board", variant: "success" });
         },
@@ -97,7 +147,7 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
     if (ok) {
       deleteMutation.mutate(currentBoardId, {
         onSuccess: () => {
-          setActiveBoardId("");
+          handleSelectBoard("");
           ui?.toast({ title: "Board deleted" });
         },
       });
@@ -110,17 +160,25 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
       {
         onSuccess: () => {
           ui?.toast({ title: "Task status updated", variant: "success" });
+          if (selectedTask && selectedTask.id === taskId) {
+            const foundStatus = statuses.find((s) => s.id === newStatusId);
+            setSelectedTask({
+              ...selectedTask,
+              status_id: newStatusId,
+              status_name: foundStatus?.name || selectedTask.status_name,
+            });
+          }
         },
       }
     );
   };
 
   const handleCardClick = (task: CrossProjectTask) => {
-    if ((ui as any)?.openTask) {
-      (ui as any).openTask(task.id, task.project_id);
-    } else if (onTaskClick) {
-      onTaskClick(task);
-    } else if (ui?.navigate) {
+    setSelectedTask(task);
+  };
+
+  const handleOpenFullPage = (task: CrossProjectTask) => {
+    if (ui?.navigate) {
       ui.navigate(`/projects/${task.project_id}/tasks/${task.id}`);
     }
   };
@@ -131,8 +189,9 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
         boards={boards}
         activeBoard={activeBoard}
         projects={projects}
+        assignees={assignees}
         filters={filters}
-        onSelectBoard={setActiveBoardId}
+        onSelectBoard={handleSelectBoard}
         onCreateBoardClick={handleCreateBoard}
         onSettingsClick={() => setIsSettingsOpen(true)}
         onFilterChange={setFilters}
@@ -172,6 +231,17 @@ function Content(props: ViewExtensionProps & { onTaskClick?: (task: any) => void
         </div>
       )}
 
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        task={selectedTask}
+        allStatuses={statuses}
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onStatusChange={handleStatusChange}
+        onOpenFullPage={handleOpenFullPage}
+      />
+
+      {/* Settings Modal */}
       <BoardSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
