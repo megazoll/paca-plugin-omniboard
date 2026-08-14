@@ -193,4 +193,40 @@ func TestGetBoardTasks_WithoutAssigneeIDColumn(t *testing.T) {
 	}
 }
 
+func TestListProjectsAndStatuses(t *testing.T) {
+	tc := setupPlugin(t)
+
+	resProj := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/projects", callerReq())
+	if resProj.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", resProj.StatusCode, resProj.BodyString())
+	}
+	projs := decodeData[[]ProjectItem](t, resProj)
+	if len(projs) != 2 {
+		t.Fatalf("expected 2 projects, got %d", len(projs))
+	}
+
+	resStatus := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/statuses", callerReq())
+	if resStatus.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", resStatus.StatusCode, resStatus.BodyString())
+	}
+	statuses := decodeData[[]StatusItem](t, resStatus)
+	if len(statuses) != 2 {
+		t.Fatalf("expected 2 statuses, got %d", len(statuses))
+	}
+}
+
+func TestAdminRoutes(t *testing.T) {
+	tc := setupPlugin(t)
+
+	adminReq := callerReq()
+	adminReq.Caller.CallerRole = "GLOBAL_ADMIN"
+	adminReq.Caller.ProjectID = ""
+
+	res := tc.Call("GET", "/omniboard/admin-boards", adminReq)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+}
+
+
 

@@ -11,7 +11,7 @@ import (
 
 // listProjects returns all active projects in PACA core.
 func (p *omniboardPlugin) listProjects(req *plugin.Request, res *plugin.Response) {
-	query := `SELECT id, name, COALESCE(description, '') AS description, task_id_prefix FROM projects ORDER BY name ASC`
+	query := `SELECT id, name, COALESCE(description::text, '') AS description, task_id_prefix FROM projects ORDER BY name ASC`
 	rows, err := p.db.Query(query)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to query projects: %v", err)})
@@ -128,7 +128,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			whereID = "WHERE id IS NOT NULL"
 		}
 
-		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
+		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
 			assigneeIDSelect, assigneeNameSelect, prioritySelect, extraJoin, whereID)
 
 		sqlParts := []string{baseSQL}
@@ -149,7 +149,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		// Filter by search query if provided in request params
 		searchQ := req.QueryParam("search")
 		if searchQ != "" {
-			sqlParts = append(sqlParts, fmt.Sprintf("AND (t.title ILIKE $%d OR t.description ILIKE $%d OR CONCAT(p.task_id_prefix, '-', t.task_number) ILIKE $%d)", argIdx, argIdx, argIdx))
+			sqlParts = append(sqlParts, fmt.Sprintf("AND (t.title ILIKE $%d OR t.description::text ILIKE $%d OR CONCAT(p.task_id_prefix, '-', t.task_number) ILIKE $%d)", argIdx, argIdx, argIdx))
 			args = append(args, "%"+searchQ+"%")
 			argIdx++
 		}

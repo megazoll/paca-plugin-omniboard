@@ -31,6 +31,41 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
 
   const projectKey = `${task.project_prefix}-${task.task_number}`;
 
+  const renderDescriptionPreview = (raw?: string) => {
+    if (!raw) return null;
+    let text = raw;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const extractContent = (nodes: any[]): string => {
+            return nodes
+              .map((node) => {
+                if (typeof node === "string") return node;
+                if (node && typeof node === "object") {
+                  if (Array.isArray(node.content)) return extractContent(node.content);
+                  if (typeof node.text === "string") return node.text;
+                }
+                return "";
+              })
+              .filter(Boolean)
+              .join(" ");
+          };
+          const extracted = extractContent(parsed).trim();
+          if (extracted) text = extracted;
+        }
+      } catch {
+        // Fallback to raw string
+      }
+    }
+    return text ? (
+      <p className="text-xs text-muted-foreground line-clamp-1">
+        {text}
+      </p>
+    ) : null;
+  };
+
   return (
     <div className="group relative bg-card border border-border rounded-lg p-3.5 shadow-sm hover:shadow-md hover:border-primary/40 transition-all cursor-pointer flex flex-col gap-2.5">
       {/* Top Bar: Project Badge + Task Key + Priority */}
@@ -56,11 +91,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       </div>
 
       {/* Optional Description Preview */}
-      {task.description && (
-        <p className="text-xs text-muted-foreground line-clamp-1">
-          {task.description}
-        </p>
-      )}
+      {renderDescriptionPreview(task.description)}
 
       {/* Footer: Assignee & Quick Status Dropdown */}
       <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">

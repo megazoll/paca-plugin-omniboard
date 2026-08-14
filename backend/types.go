@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -144,3 +147,34 @@ func (s *scanner) boolVal(col string) bool {
 		return false
 	}
 }
+
+func (s *scanner) jsonVal(col string, dest any) error {
+	i, ok := s.idx[col]
+	if !ok || i >= len(s.row) || s.row[i] == nil {
+		return nil
+	}
+	switch v := s.row[i].(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		return json.Unmarshal([]byte(v), dest)
+	case *string:
+		if v == nil || *v == "" {
+			return nil
+		}
+		return json.Unmarshal([]byte(*v), dest)
+	case []byte:
+		if len(v) == 0 {
+			return nil
+		}
+		return json.Unmarshal(v, dest)
+	default:
+		data, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, dest)
+	}
+}
+

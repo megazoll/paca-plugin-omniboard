@@ -262,29 +262,17 @@ func parseBoardRows(res *plugin.DBQueryResult) []Omniboard {
 			Description: sc.str("description"),
 		}
 
-		// Unmarshal ProjectIDs
-		projIDsVal := sc.str("project_ids")
-		if projIDsVal != "" {
-			_ = json.Unmarshal([]byte(projIDsVal), &b.ProjectIDs)
-		}
+		_ = sc.jsonVal("project_ids", &b.ProjectIDs)
 		if b.ProjectIDs == nil {
 			b.ProjectIDs = []string{}
 		}
 
-		// Unmarshal ColumnConfig
-		colConfigVal := sc.str("column_config")
-		if colConfigVal != "" {
-			_ = json.Unmarshal([]byte(colConfigVal), &b.ColumnConfig)
-		}
+		_ = sc.jsonVal("column_config", &b.ColumnConfig)
 		if b.ColumnConfig == nil {
 			b.ColumnConfig = []ColumnConfig{}
 		}
 
-		// Unmarshal Filters
-		filtersVal := sc.str("filters")
-		if filtersVal != "" {
-			_ = json.Unmarshal([]byte(filtersVal), &b.Filters)
-		}
+		_ = sc.jsonVal("filters", &b.Filters)
 		if b.Filters == nil {
 			b.Filters = map[string]any{}
 		}
