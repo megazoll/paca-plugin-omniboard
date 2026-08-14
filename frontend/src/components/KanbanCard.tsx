@@ -32,6 +32,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   };
 
   const priorityMeta = getPriorityMeta(task.priority);
+  const taskKey = task.project_prefix
+    ? `${task.project_prefix}-${task.task_number}`
+    : `#${task.task_number}`;
 
   return (
     <div
@@ -41,27 +44,10 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         "hover:border-border/50 hover:shadow-sm"
       )}
     >
-      {/* Task Identifier: Prefix + Number */}
-      <div className="mb-1.5 flex items-center justify-between gap-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="inline-flex items-center rounded-md px-1.5 py-0.5 font-[JetBrains_Mono,monospace] text-[11px] font-semibold tracking-wide bg-primary/10 text-primary border border-primary/20 shrink-0">
-            {task.project_prefix}
-          </span>
-          <span className="font-[JetBrains_Mono,monospace] text-xs font-semibold text-muted-foreground/50 tracking-wide truncate">
-            #{task.task_number}
-          </span>
-        </div>
-
-        {/* Priority indicator */}
-        <span
-          className="inline-flex items-center gap-1 text-xs font-medium shrink-0"
-          style={{ color: priorityMeta.color }}
-        >
-          <span
-            className="size-1.5 rounded-full shrink-0"
-            style={{ background: priorityMeta.color }}
-          />
-          {priorityMeta.label}
+      {/* Task Key (e.g. PROJ-123) matching PACA native format */}
+      <div className="mb-1 flex items-center justify-between gap-1.5">
+        <span className="font-[JetBrains_Mono,monospace] text-xs font-semibold text-muted-foreground/50 tracking-wide">
+          {taskKey}
         </span>
       </div>
 
@@ -70,29 +56,43 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         {task.title}
       </span>
 
-      {/* Bottom row: Quick status selector + Assignee Avatar */}
-      <div className="mt-2.5 flex items-center justify-between gap-2 pt-1 border-t border-border/20">
-        {/* Status Dropdown */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <select
-            value={task.status_id || ""}
-            onChange={(e) => onStatusChange(task.id, e.target.value)}
-            className="h-5 text-[11px] px-1 py-0 bg-muted/40 border border-border/40 rounded text-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer hover:border-primary/40 hover:text-foreground transition-colors max-w-[140px] truncate"
-            title="Change status"
+      {/* Field Chips (Priority + Assignee + Quick Status) */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5 pt-1">
+        <div className="flex items-center gap-2">
+          {/* Priority indicator */}
+          <span
+            className="inline-flex items-center gap-1 text-xs font-medium shrink-0"
+            style={{ color: priorityMeta.color }}
           >
-            {allStatuses
-              .filter((s) => s.project_id === task.project_id)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+            <span
+              className="size-1.5 rounded-full shrink-0"
+              style={{ background: priorityMeta.color }}
+            />
+            {priorityMeta.label}
+          </span>
+
+          {/* Quick status dropdown */}
+          <div onClick={(e) => e.stopPropagation()}>
+            <select
+              value={task.status_id || ""}
+              onChange={(e) => onStatusChange(task.id, e.target.value)}
+              className="h-5 text-[11px] px-1 py-0 bg-muted/40 border border-border/30 rounded text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer transition-colors max-w-[120px] truncate"
+              title="Change status"
+            >
+              {allStatuses
+                .filter((s) => s.project_id === task.project_id)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              {allStatuses.length === 0 && (
+                <option value={task.status_id || ""}>
+                  {task.status_name || "Status"}
                 </option>
-              ))}
-            {allStatuses.length === 0 && (
-              <option value={task.status_id || ""}>
-                {task.status_name || "Status"}
-              </option>
-            )}
-          </select>
+              )}
+            </select>
+          </div>
         </div>
 
         {/* Assignee Avatar */}

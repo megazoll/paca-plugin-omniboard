@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Kanban,
+  KanbanSquare,
   Plus,
   Settings,
   Search,
@@ -35,51 +35,40 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
   isFetching,
 }) => {
   return (
-    <div className="flex flex-col gap-3.5 border-b border-border/40 pb-4 mb-3 px-6 pt-5">
-      {/* Top Row: Title, Board Switcher & Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex flex-col shrink-0 border-b border-border/25 bg-background">
+      {/* Top Title Row matching PACA InteractionLayout */}
+      <div className="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-            <Kanban className="size-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-foreground tracking-tight">
-                {activeBoard?.name || "Omniboard"}
-              </h1>
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-semibold rounded-md bg-primary/10 text-primary border border-primary/20">
-                Multi-Project
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground/80">
-              {activeBoard?.description || "Cross-project Kanban board"}
-            </p>
+          <KanbanSquare className="size-6 text-primary shrink-0" />
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-foreground tracking-tight">
+              {activeBoard?.name || "Omniboard"}
+            </h1>
+            {boards.length > 1 && (
+              <select
+                className="h-7 px-2 py-0.5 bg-muted/40 border border-border/40 rounded-md text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer ml-1"
+                value={activeBoard?.id || ""}
+                onChange={(e) => onSelectBoard(e.target.value)}
+              >
+                {boards.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
-        {/* Board Switcher Controls */}
+        {/* Right Actions */}
         <div className="flex items-center gap-2">
-          {boards.length > 0 && (
-            <select
-              className="h-8.5 px-3 py-1 bg-background border border-border/60 rounded-lg text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors"
-              value={activeBoard?.id || ""}
-              onChange={(e) => onSelectBoard(e.target.value)}
-            >
-              {boards.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.project_ids.length > 0 ? `${b.project_ids.length} projects` : "All projects"})
-                </option>
-              ))}
-            </select>
-          )}
-
           <button
             type="button"
             onClick={onCreateBoardClick}
-            className="h-8.5 px-3 flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 rounded-lg border border-dashed border-border/60 bg-muted/10 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary transition-all duration-150"
             title="Create new board"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-3.5 shrink-0" />
             <span>New Board</span>
           </button>
 
@@ -87,10 +76,10 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
             <button
               type="button"
               onClick={onSettingsClick}
-              className="h-8.5 px-3 flex items-center gap-1.5 bg-muted/60 text-foreground border border-border/50 text-xs font-medium rounded-lg hover:bg-muted transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/20 px-2.5 py-1.5 text-xs font-medium text-muted-foreground/80 hover:text-foreground hover:bg-muted/40 transition-all duration-150"
               title="Board settings"
             >
-              <Settings className="size-3.5 text-muted-foreground" />
+              <Settings className="size-3.5" />
               <span>Settings</span>
             </button>
           )}
@@ -98,8 +87,8 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className={`size-8.5 flex items-center justify-center border border-border/50 rounded-lg hover:bg-muted/60 transition-colors ${
-              isFetching ? "animate-spin text-primary" : "text-muted-foreground"
+            className={`flex size-7.5 items-center justify-center rounded-lg border border-border/40 bg-muted/20 hover:bg-muted/40 transition-all duration-150 ${
+              isFetching ? "animate-spin text-primary" : "text-muted-foreground/70 hover:text-foreground"
             }`}
             title="Refresh tasks"
           >
@@ -108,28 +97,28 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="flex flex-wrap items-center gap-2.5 pt-1">
-        {/* Search Text */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/60 pointer-events-none" />
+      {/* Filter / Search Bar matching PACA View Tab sub-bar */}
+      <div className="flex items-center gap-3 border-t border-border/20 bg-muted/10 px-6 py-2">
+        {/* Search Input */}
+        <div className="relative flex items-center min-w-[200px] max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50 pointer-events-none" />
           <input
             type="text"
-            placeholder="Filter tasks..."
+            placeholder="Search tasks..."
             value={filters.search || ""}
             onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            className="w-full h-8 pl-8 pr-3 text-xs bg-muted/20 border border-border/40 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+            className="w-full h-7.5 pl-8 pr-3 text-xs bg-muted/25 border border-border/30 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
         </div>
 
         {/* Project Filter */}
         {projects.length > 0 && (
           <div className="flex items-center gap-1.5">
-            <Layers className="size-3.5 text-muted-foreground/60" />
+            <Layers className="size-3.5 text-muted-foreground/50" />
             <select
               value={filters.projectId || ""}
               onChange={(e) => onFilterChange({ ...filters, projectId: e.target.value || undefined })}
-              className="h-8 px-2.5 text-xs bg-muted/20 border border-border/40 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              className="h-7.5 px-2 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
             >
               <option value="">All Projects</option>
               {projects.map((p) => (
@@ -145,7 +134,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
         <select
           value={filters.priority || ""}
           onChange={(e) => onFilterChange({ ...filters, priority: e.target.value || undefined })}
-          className="h-8 px-2.5 text-xs bg-muted/20 border border-border/40 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+          className="h-7.5 px-2 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer"
         >
           <option value="">All Priorities</option>
           <option value="urgent">Urgent</option>
@@ -154,12 +143,12 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           <option value="low">Low</option>
         </select>
 
-        {/* Clear filters button */}
+        {/* Clear Filters */}
         {(filters.search || filters.projectId || filters.priority || filters.assigneeId) && (
           <button
             type="button"
             onClick={() => onFilterChange({})}
-            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground underline transition-colors ml-auto"
           >
             Clear Filters
           </button>
