@@ -18,25 +18,33 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onCardClick,
 }) => {
   return (
-    <div className="flex flex-col flex-1 min-w-[280px] max-w-[350px] bg-muted/20 border border-border rounded-xl p-3 h-full max-h-[calc(100vh-220px)]">
-      {/* Column Header */}
-      <div className="flex items-center justify-between gap-2 pb-3 px-1 border-b border-border/60 mb-3">
-        <div className="flex items-center gap-2">
+    <div className="flex w-72 shrink-0 flex-col gap-2.5">
+      {/* Column Header matching PACA Board View */}
+      <div className="flex items-center gap-2 px-2 pb-1 group">
+        {column.color && (
           <span
-            className="size-3 rounded-full shrink-0"
-            style={{ backgroundColor: column.color || "#64748b" }}
+            className="size-1.75 rounded-full shrink-0"
+            style={{
+              background: column.color,
+              boxShadow: `0 0 6px ${column.color}40`,
+            }}
           />
-          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-            {column.title}
-          </h3>
-        </div>
-        <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-muted text-muted-foreground border border-border">
+        )}
+        <span className="text-xs font-bold text-foreground/80 tracking-[0.08em] uppercase flex-1 truncate">
+          {column.title}
+        </span>
+        <span className="rounded-full bg-muted/60 px-2 py-0.5 text-xs font-bold text-muted-foreground/70 tabular-nums">
           {tasks.length}
         </span>
       </div>
 
-      {/* Column Body: Cards List */}
-      <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+      {/* Column Body matching PACA Column Cards Slot */}
+      <div className="flex flex-col gap-2 rounded-xl p-2 min-h-28 transition-all duration-200 bg-muted/40 dark:bg-muted">
+        {tasks.length === 0 && (
+          <div className="flex flex-1 flex-col items-center justify-center py-6 text-muted-foreground/30">
+            <p className="text-sm">No tasks</p>
+          </div>
+        )}
         {tasks.map((task) => (
           <KanbanCard
             key={task.id}
@@ -46,12 +54,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             onCardClick={onCardClick}
           />
         ))}
-
-        {tasks.length === 0 && (
-          <div className="flex items-center justify-center p-8 border border-dashed border-border/80 rounded-lg text-xs text-muted-foreground italic">
-            No tasks in {column.title}
-          </div>
-        )}
       </div>
     </div>
   );

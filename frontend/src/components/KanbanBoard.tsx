@@ -72,7 +72,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4 pt-1 h-full items-start">
+    <div className="flex flex-1 min-h-0 items-start gap-4 overflow-auto px-6 py-5 pb-8">
       {columns.map((col, idx) => {
         const colTasks = getTasksForColumn(col, idx);
         return (

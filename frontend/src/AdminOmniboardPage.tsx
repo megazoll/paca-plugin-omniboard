@@ -14,7 +14,7 @@ import {
   useDeleteOmniboard,
   useUpdateTaskStatus,
 } from "./api";
-import type { BoardFilters, Omniboard, ColumnConfig } from "./types";
+import type { BoardFilters, Omniboard, ColumnConfig, CrossProjectTask } from "./types";
 
 export default function AdminOmniboardPage(props: AdminPageProps) {
   return (
@@ -24,7 +24,8 @@ export default function AdminOmniboardPage(props: AdminPageProps) {
   );
 }
 
-function Content({ api, ui }: AdminPageProps) {
+function Content(props: AdminPageProps & { onTaskClick?: (task: any) => void }) {
+  const { api, ui, onTaskClick } = props;
   const scope = "admin";
   const { data: boards = [], isLoading: loadingBoards } = useOmniboards(api, scope);
   const { data: projects = [] } = useOmniboardProjects(api, scope);
@@ -115,14 +116,18 @@ function Content({ api, ui }: AdminPageProps) {
     );
   };
 
-  const handleCardClick = (task: any) => {
-    if (ui?.navigate) {
+  const handleCardClick = (task: CrossProjectTask) => {
+    if ((ui as any)?.openTask) {
+      (ui as any).openTask(task.id, task.project_id);
+    } else if (onTaskClick) {
+      onTaskClick(task);
+    } else if (ui?.navigate) {
       ui.navigate(`/projects/${task.project_id}/tasks/${task.id}`);
     }
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-[1600px] mx-auto p-6 overflow-hidden">
+    <div className="flex flex-col h-full w-full overflow-hidden bg-background">
       <BoardHeader
         boards={boards}
         activeBoard={activeBoard}
@@ -141,7 +146,7 @@ function Content({ api, ui }: AdminPageProps) {
       )}
 
       {!loadingBoards && !activeBoard && (
-        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-xl">
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center border border-dashed border-border/60 rounded-xl m-6">
           <h3 className="text-base font-semibold text-foreground mb-1">No Omniboards Found</h3>
           <p className="text-sm text-muted-foreground max-w-md mb-4">
             Create a multi-project Kanban board to aggregate and organize tasks across PACA projects.
@@ -149,7 +154,7 @@ function Content({ api, ui }: AdminPageProps) {
           <button
             type="button"
             onClick={handleCreateBoard}
-            className="h-9 px-4 flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
+            className="h-8.5 px-4 flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-xs"
           >
             Create Board
           </button>
@@ -157,7 +162,7 @@ function Content({ api, ui }: AdminPageProps) {
       )}
 
       {!loadingBoards && activeBoard && (
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           <KanbanBoard
             columns={activeBoard.column_config || []}
             tasks={tasks}

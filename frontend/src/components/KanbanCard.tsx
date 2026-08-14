@@ -1,6 +1,7 @@
 import React from "react";
-import { User, AlertCircle, ArrowUpRight } from "lucide-react";
+import { User } from "lucide-react";
 import type { CrossProjectTask, StatusInfo } from "../types";
+import { cn } from "../lib/utils";
 
 interface KanbanCardProps {
   task: CrossProjectTask;
@@ -15,101 +16,69 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   onStatusChange,
   onCardClick,
 }) => {
-  const getPriorityBadge = (priority: string) => {
-    const p = priority.toLowerCase();
+  const getPriorityMeta = (priority: string) => {
+    const p = (priority || "medium").toLowerCase();
     switch (p) {
       case "urgent":
-        return <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/15 text-red-500 uppercase">Urgent</span>;
+        return { color: "#ef4444", label: "Urgent" };
       case "high":
-        return <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-orange-500/15 text-orange-500 uppercase">High</span>;
+        return { color: "#f97316", label: "High" };
       case "low":
-        return <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-slate-500/15 text-slate-500 uppercase">Low</span>;
+        return { color: "#64748b", label: "Low" };
+      case "medium":
       default:
-        return <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/15 text-blue-500 uppercase">Medium</span>;
+        return { color: "#3b82f6", label: "Medium" };
     }
   };
 
-  const projectKey = `${task.project_prefix}-${task.task_number}`;
-
-  const renderDescriptionPreview = (raw?: string) => {
-    if (!raw) return null;
-    let text = raw;
-    const trimmed = raw.trim();
-    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          const extractContent = (nodes: any[]): string => {
-            return nodes
-              .map((node) => {
-                if (typeof node === "string") return node;
-                if (node && typeof node === "object") {
-                  if (Array.isArray(node.content)) return extractContent(node.content);
-                  if (typeof node.text === "string") return node.text;
-                }
-                return "";
-              })
-              .filter(Boolean)
-              .join(" ");
-          };
-          const extracted = extractContent(parsed).trim();
-          if (extracted) text = extracted;
-        }
-      } catch {
-        // Fallback to raw string
-      }
-    }
-    return text ? (
-      <p className="text-xs text-muted-foreground line-clamp-1">
-        {text}
-      </p>
-    ) : null;
-  };
+  const priorityMeta = getPriorityMeta(task.priority);
 
   return (
-    <div className="group relative bg-card border border-border rounded-lg p-3.5 shadow-sm hover:shadow-md hover:border-primary/40 transition-all cursor-pointer flex flex-col gap-2.5">
-      {/* Top Bar: Project Badge + Task Key + Priority */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {/* Distinct Multi-project Badge */}
-          <span className="px-2 py-0.5 text-xs font-bold rounded bg-primary/10 text-primary border border-primary/20 tracking-wider">
+    <div
+      onClick={() => onCardClick?.(task)}
+      className={cn(
+        "group relative rounded-xl border border-border/30 bg-card p-3 shadow-xs cursor-pointer transition-all duration-150 select-none",
+        "hover:border-border/50 hover:shadow-sm"
+      )}
+    >
+      {/* Task Identifier: Prefix + Number */}
+      <div className="mb-1.5 flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="inline-flex items-center rounded-md px-1.5 py-0.5 font-[JetBrains_Mono,monospace] text-[11px] font-semibold tracking-wide bg-primary/10 text-primary border border-primary/20 shrink-0">
             {task.project_prefix}
           </span>
-          <span className="text-xs font-semibold text-muted-foreground group-hover:text-primary transition-colors">
-            {projectKey}
+          <span className="font-[JetBrains_Mono,monospace] text-xs font-semibold text-muted-foreground/50 tracking-wide truncate">
+            #{task.task_number}
           </span>
         </div>
-        <div>{getPriorityBadge(task.priority)}</div>
+
+        {/* Priority indicator */}
+        <span
+          className="inline-flex items-center gap-1 text-xs font-medium shrink-0"
+          style={{ color: priorityMeta.color }}
+        >
+          <span
+            className="size-1.5 rounded-full shrink-0"
+            style={{ background: priorityMeta.color }}
+          />
+          {priorityMeta.label}
+        </span>
       </div>
 
       {/* Task Title */}
-      <div
-        onClick={() => onCardClick?.(task)}
-        className="text-sm font-medium text-foreground leading-snug line-clamp-2 hover:text-primary transition-colors"
-      >
+      <span className="text-sm font-medium leading-snug text-foreground line-clamp-2">
         {task.title}
-      </div>
+      </span>
 
-      {/* Optional Description Preview */}
-      {renderDescriptionPreview(task.description)}
-
-      {/* Footer: Assignee & Quick Status Dropdown */}
-      <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-        {/* Assignee */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="size-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-foreground">
-            {task.assignee_name ? task.assignee_name.slice(0, 2).toUpperCase() : <User className="size-3" />}
-          </div>
-          <span className="truncate">{task.assignee_name || "Unassigned"}</span>
-        </div>
-
-        {/* Quick Status Change Menu */}
+      {/* Bottom row: Quick status selector + Assignee Avatar */}
+      <div className="mt-2.5 flex items-center justify-between gap-2 pt-1 border-t border-border/20">
+        {/* Status Dropdown */}
         <div onClick={(e) => e.stopPropagation()}>
           <select
             value={task.status_id || ""}
             onChange={(e) => onStatusChange(task.id, e.target.value)}
-            className="h-6 text-[11px] px-1.5 py-0 bg-background border border-input rounded text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer hover:border-primary/50"
-            title="Move to status"
+            className="h-5 text-[11px] px-1 py-0 bg-muted/40 border border-border/40 rounded text-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer hover:border-primary/40 hover:text-foreground transition-colors max-w-[140px] truncate"
+            title="Change status"
           >
             {allStatuses
               .filter((s) => s.project_id === task.project_id)
@@ -118,11 +87,29 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                   {s.name}
                 </option>
               ))}
-            {/* Fallback if status list isn't project-specific */}
             {allStatuses.length === 0 && (
-              <option value={task.status_id || ""}>{task.status_name || "Status"}</option>
+              <option value={task.status_id || ""}>
+                {task.status_name || "Status"}
+              </option>
             )}
           </select>
+        </div>
+
+        {/* Assignee Avatar */}
+        <div
+          title={task.assignee_name || "Unassigned"}
+          className={cn(
+            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-border/25 shrink-0",
+            task.assignee_name
+              ? "bg-linear-to-br from-primary/20 to-primary/15 text-primary"
+              : "bg-linear-to-br from-muted/80 to-muted/40 text-muted-foreground"
+          )}
+        >
+          {task.assignee_name ? (
+            task.assignee_name.slice(0, 1).toUpperCase()
+          ) : (
+            <User className="size-2.5" />
+          )}
         </div>
       </div>
     </div>
