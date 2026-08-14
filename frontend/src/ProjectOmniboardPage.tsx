@@ -4,6 +4,7 @@ import type { ProjectPageProps } from "@paca-ai/plugin-sdk-react";
 import { BoardHeader } from "./components/BoardHeader";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { KanbanBoard } from "./components/KanbanBoard";
+import { TaskDetailSidebar } from "./components/TaskDetailSidebar";
 import {
   useOmniboards,
   useOmniboardTasks,
@@ -44,6 +45,7 @@ function Content(props: ProjectPageProps) {
   const [activeBoardId, setActiveBoardId] = useState<string>(getInitialBoardId);
   const [filters, setFilters] = useState<BoardFilters>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<CrossProjectTask | null>(null);
 
   // Active board selection
   const activeBoard = useMemo<Omniboard | null>(() => {
@@ -66,30 +68,26 @@ function Content(props: ProjectPageProps) {
       } else {
         url.searchParams.delete("boardId");
       }
-      window.history.replaceState(null, "", url.toString());
+      window.history.replaceState({}, "", url.toString());
     } catch {
       // Ignore
     }
   };
 
-  // Ensure URL reflects current board on initial resolution
+  // Sync activeBoardId when boards load
   useEffect(() => {
-    if (currentBoardId) {
-      try {
-        const url = new URL(window.location.href);
-        if (url.searchParams.get("boardId") !== currentBoardId) {
-          url.searchParams.set("boardId", currentBoardId);
-          window.history.replaceState(null, "", url.toString());
-        }
-      } catch {
-        // Ignore
+    if (!activeBoardId && boards.length > 0) {
+      const initId = getInitialBoardId();
+      if (initId && boards.some((b) => b.id === initId)) {
+        setActiveBoardId(initId);
+      } else {
+        setActiveBoardId(boards[0].id);
       }
     }
-  }, [currentBoardId]);
+  }, [boards, activeBoardId]);
 
   const {
     data: tasks = [],
-    isLoading: loadingTasks,
     isFetching,
     refetch,
   } = useOmniboardTasks(api, currentBoardId, filters, scope);
@@ -177,12 +175,30 @@ function Content(props: ProjectPageProps) {
     );
   };
 
-  // Open native system TaskDetailModal via host handlers
+  // Open right sidebar when clicking a card
   const handleCardClick = (task: CrossProjectTask) => {
-    if ((props as any)?.onTaskClick) {
-      (props as any).onTaskClick(task);
-    } else if ((ui as any)?.openTask) {
-      (ui as any).openTask(task.id, task.project_id);
+    setSelectedTask(task);
+  };
+
+  // Update status from within sidebar
+  const handleSidebarStatusChange = (taskId: string, newStatusId: string) => {
+    handleStatusChange(taskId, newStatusId);
+    if (selectedTask && selectedTask.id === taskId) {
+      const updatedStatus = statuses.find((s) => s.id === newStatusId);
+      setSelectedTask({
+        ...selectedTask,
+        status_id: newStatusId,
+        status_name: updatedStatus?.name || selectedTask.status_name,
+        status_category: updatedStatus?.category || selectedTask.status_category,
+        status_color: updatedStatus?.color || selectedTask.status_color,
+      });
+    }
+  };
+
+  // Navigate to full task detail page
+  const handleNavigateToTask = (projectId: string, taskId: string) => {
+    if (typeof (ui as any)?.navigate === "function") {
+      (ui as any).navigate(`/projects/${projectId}/tasks/${taskId}`);
     }
   };
 
@@ -245,6 +261,16 @@ function Content(props: ProjectPageProps) {
         onSave={handleSaveSettings}
         onDelete={handleDeleteBoard}
         isSaving={updateMutation.isPending}
+      />
+
+      {/* Right Task Detail Sidebar */}
+      <TaskDetailSidebar
+        task={selectedTask}
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        allStatuses={statuses}
+        onStatusChange={handleSidebarStatusChange}
+        onNavigateToTask={handleNavigateToTask}
       />
     </div>
   );
