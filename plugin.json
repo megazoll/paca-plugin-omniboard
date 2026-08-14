@@ -2,9 +2,14 @@
   "id": "com.paca.omniboard",
   "displayName": "Omniboard",
   "description": "Multi-project Kanban board plugin for PACA AI to view, filter, and manage tasks across multiple projects.",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "minCoreVersion": "v0.11.2",
-  "permissions": ["db.read", "db.write", "events.subscribe", "cache"],
+  "permissions": [
+    "db.read",
+    "db.write",
+    "events.subscribe",
+    "cache"
+  ],
   "backend": {
     "eventSubscriptions": [],
     "routes": [
@@ -12,153 +17,323 @@
         "method": "GET",
         "path": "/projects/:projectId/omniboard/boards",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
         ]
       },
       {
         "method": "POST",
         "path": "/projects/:projectId/omniboard/boards",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/projects/:projectId/omniboard/boards/:boardId",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
         ]
       },
       {
         "method": "PATCH",
         "path": "/projects/:projectId/omniboard/boards/:boardId",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.write"
+            ]
+          }
         ]
       },
       {
         "method": "DELETE",
         "path": "/projects/:projectId/omniboard/boards/:boardId",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/projects/:projectId/omniboard/projects",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/projects/:projectId/omniboard/statuses",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/projects/:projectId/omniboard/boards/:boardId/tasks",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.read"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
         ]
       },
       {
         "method": "PATCH",
         "path": "/projects/:projectId/omniboard/tasks/:taskId/status",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "project", "permissions": ["projects.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/omniboard/admin-boards",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "POST",
         "path": "/omniboard/admin-boards",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "PATCH",
         "path": "/omniboard/admin-boards/:boardId",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "DELETE",
         "path": "/omniboard/admin-boards/:boardId",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/omniboard/admin-projects",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/omniboard/admin-statuses",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "GET",
         "path": "/omniboard/admin-boards/:boardId/tasks",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       },
       {
         "method": "PATCH",
         "path": "/omniboard/admin-tasks/:taskId/status",
         "middlewares": [
-          { "name": "optionalAuthn" },
-          { "name": "requireFreshPassword" },
-          { "name": "requirePermissions", "scope": "global", "permissions": ["users.write"] }
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.write"
+            ]
+          }
         ]
       }
     ]
@@ -207,6 +382,8 @@
   },
   "skills": {
     "baseUrl": "/plugins-skills/com.paca.omniboard",
-    "names": ["paca-omniboard"]
+    "names": [
+      "paca-omniboard"
+    ]
   }
 }

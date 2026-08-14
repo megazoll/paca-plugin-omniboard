@@ -10,6 +10,13 @@ interface KanbanBoardProps {
   onCardClick?: (task: CrossProjectTask) => void;
 }
 
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+  { id: "col-backlog", title: "Backlog", status_categories: ["backlog"], color: "#64748b" },
+  { id: "col-todo", title: "To Do", status_categories: ["todo", "to_do", "open"], color: "#eab308" },
+  { id: "col-inprogress", title: "In Progress", status_categories: ["inprogress", "in_progress", "in_review", "doing"], color: "#3b82f6" },
+  { id: "col-done", title: "Done", status_categories: ["done", "completed", "closed", "resolved"], color: "#22c55e" },
+];
+
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: rawColumns,
   tasks: rawTasks,
@@ -17,7 +24,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onStatusChange,
   onCardClick,
 }) => {
-  const columns = Array.isArray(rawColumns) ? rawColumns : [];
+  const columns = Array.isArray(rawColumns) && rawColumns.length > 0 ? rawColumns : DEFAULT_COLUMNS;
   const tasks = Array.isArray(rawTasks) ? rawTasks : [];
 
   const normalize = (str?: string) => (str || "").toLowerCase().replace(/[\s_-]/g, "");
@@ -25,6 +32,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const isTaskInColumn = (t: CrossProjectTask, col: ColumnConfig): boolean => {
     const taskCat = normalize(t.status_category);
     const taskName = normalize(t.status_name);
+    const colTitle = normalize(col.title);
 
     if (col.status_categories && col.status_categories.length > 0) {
       const catMatch = col.status_categories.some((c) => {
@@ -38,6 +46,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (col.status_names && col.status_names.length > 0) {
       const nameMatch = col.status_names.some((n) => normalize(n) === taskName);
       if (nameMatch) return true;
+    }
+
+    // Direct title matching fallback
+    if (colTitle && (colTitle === taskCat || colTitle === taskName)) {
+      return true;
     }
 
     return false;

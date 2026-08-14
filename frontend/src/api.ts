@@ -42,8 +42,13 @@ function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: 
 
 async function unwrapData<T>(promise: Promise<any>): Promise<T> {
   const res = await promise;
-  if (res && typeof res === "object" && "data" in res && res.data !== undefined) {
-    return res.data as T;
+  if (res && typeof res === "object") {
+    if ("error" in res && res.error && !("data" in res)) {
+      throw new Error(typeof res.error === "string" ? res.error : JSON.stringify(res.error));
+    }
+    if ("data" in res && res.data !== undefined) {
+      return res.data as T;
+    }
   }
   return res as T;
 }
@@ -51,7 +56,8 @@ async function unwrapData<T>(promise: Promise<any>): Promise<T> {
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export function useOmniboards(api: PluginApiClient, scope: OmniboardScope = "project") {
-  const path = getBasePath(api, scope);
+  const basePath = getBasePath(api, scope);
+  const path = `${basePath}?scope=${scope}`;
   return useQuery<Omniboard[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "boards", scope, api.projectId],
     queryFn: () => unwrapData<Omniboard[]>(api.pluginGet(PLUGIN_ID, path)),

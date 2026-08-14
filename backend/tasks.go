@@ -77,59 +77,113 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	}
 	board := parseBoardRows(rows)[0]
 
-	// Build SQL query for tasks
-	sqlParts := []string{
-		`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, t.assignee_id, COALESCE(u.full_name, u.username, u_pm.full_name, u_pm.username, '') AS assignee_name, COALESCE(t.priority, 'medium') AS priority, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id LEFT JOIN users u ON t.assignee_id = u.id LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id WHERE id IS NOT NULL`,
-	}
+	buildQuery := func(useImportance bool, qualifyID bool) (string, []any) {
+		prioritySelect := "COALESCE(t.priority, 'medium') AS priority"
+		if useImportance {
+			prioritySelect = `CASE 
+				WHEN t.importance >= 3 THEN 'urgent' 
+				WHEN t.importance = 2 THEN 'high' 
+				WHEN t.importance = 1 THEN 'medium' 
+				ELSE 'low' 
+			END AS priority`
+		}
 
-	args := []any{}
-	argIdx := 1
+		whereID := "WHERE t.id IS NOT NULL"
+		if !qualifyID {
+			whereID = "WHERE id IS NOT NULL"
+		}
 
-	// Filter by project_ids if specified on board
-	if len(board.ProjectIDs) > 0 {
-		placeholders := make([]string, len(board.ProjectIDs))
-		for i, pid := range board.ProjectIDs {
-			placeholders[i] = fmt.Sprintf("$%d", argIdx)
-			args = append(args, pid)
+		sqlParts := []string{
+			fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, t.assignee_id, COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id LEFT JOIN users u ON t.assignee_id = u.id %s`, prioritySelect, whereID),
+		}
+
+		args := []any{}
+		argIdx := 1
+
+		// Filter by project_ids if specified on board
+		if len(board.ProjectIDs) > 0 {
+			placeholders := make([]string, len(board.ProjectIDs))
+			for i, pid := range board.ProjectIDs {
+				placeholders[i] = fmt.Sprintf("$%d", argIdx)
+				args = append(args, pid)
+				argIdx++
+			}
+			sqlParts = append(sqlParts, fmt.Sprintf("AND t.project_id IN (%s)", strings.Join(placeholders, ", ")))
+		}
+
+		// Filter by search query if provided in request params
+		searchQ := req.QueryParam("search")
+		if searchQ != "" {
+			sqlParts = append(sqlParts, fmt.Sprintf("AND (t.title ILIKE $%d OR t.description ILIKE $%d OR CONCAT(p.task_id_prefix, '-', t.task_number) ILIKE $%d)", argIdx, argIdx, argIdx))
+			args = append(args, "%"+searchQ+"%")
 			argIdx++
 		}
-		sqlParts = append(sqlParts, fmt.Sprintf("AND t.project_id IN (%s)", strings.Join(placeholders, ", ")))
+
+		// Filter by project if provided in query params
+		filterProj := req.QueryParam("projectId")
+		if filterProj != "" {
+			sqlParts = append(sqlParts, fmt.Sprintf("AND t.project_id = $%d", argIdx))
+			args = append(args, filterProj)
+			argIdx++
+		}
+
+		// Filter by assignee if provided in query params
+		filterAssignee := req.QueryParam("assigneeId")
+		if filterAssignee != "" {
+			sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
+			args = append(args, filterAssignee)
+			argIdx++
+		}
+
+		// Filter by priority if provided in query params
+		filterPriority := req.QueryParam("priority")
+		if filterPriority != "" {
+			if useImportance {
+				switch strings.ToLower(filterPriority) {
+				case "urgent":
+					sqlParts = append(sqlParts, "AND t.importance >= 3")
+				case "high":
+					sqlParts = append(sqlParts, "AND t.importance = 2")
+				case "medium":
+					sqlParts = append(sqlParts, "AND t.importance = 1")
+				case "low":
+					sqlParts = append(sqlParts, "AND (t.importance <= 0 OR t.importance IS NULL)")
+				}
+			} else {
+				sqlParts = append(sqlParts, fmt.Sprintf("AND t.priority = $%d", argIdx))
+				args = append(args, filterPriority)
+				argIdx++
+			}
+		}
+
+		return strings.Join(sqlParts, " "), args
 	}
 
-	// Filter by search query if provided in request params
-	searchQ := req.QueryParam("search")
-	if searchQ != "" {
-		sqlParts = append(sqlParts, fmt.Sprintf("AND (t.title ILIKE $%d OR t.description ILIKE $%d OR CONCAT(p.task_id_prefix, '-', t.task_number) ILIKE $%d)", argIdx, argIdx, argIdx))
-		args = append(args, "%"+searchQ+"%")
-		argIdx++
+	// Try sequence:
+	// 1. PostgreSQL production (qualify t.id, t.importance)
+	// 2. PostgreSQL production with priority column (qualify t.id, t.priority)
+	// 3. Mock/SQLite test context (unqualified id, t.importance)
+	// 4. Mock/SQLite test context (unqualified id, t.priority)
+	var taskRows *plugin.DBQueryResult
+
+	attempts := []struct {
+		useImportance bool
+		qualifyID     bool
+	}{
+		{useImportance: true, qualifyID: true},
+		{useImportance: false, qualifyID: true},
+		{useImportance: true, qualifyID: false},
+		{useImportance: false, qualifyID: false},
 	}
 
-	// Filter by project if provided in query params
-	filterProj := req.QueryParam("projectId")
-	if filterProj != "" {
-		sqlParts = append(sqlParts, fmt.Sprintf("AND t.project_id = $%d", argIdx))
-		args = append(args, filterProj)
-		argIdx++
+	for _, att := range attempts {
+		q, args := buildQuery(att.useImportance, att.qualifyID)
+		taskRows, err = p.db.Query(q, args...)
+		if err == nil && taskRows != nil {
+			break
+		}
 	}
 
-	// Filter by assignee if provided in query params
-	filterAssignee := req.QueryParam("assigneeId")
-	if filterAssignee != "" {
-		sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
-		args = append(args, filterAssignee)
-		argIdx++
-	}
-
-	// Filter by priority if provided in query params
-	filterPriority := req.QueryParam("priority")
-	if filterPriority != "" {
-		sqlParts = append(sqlParts, fmt.Sprintf("AND t.priority = $%d", argIdx))
-		args = append(args, filterPriority)
-		argIdx++
-	}
-
-	fullSQL := strings.Join(sqlParts, " ")
-	taskRows, err := p.db.Query(fullSQL, args...)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to fetch tasks: %v", err)})
 		return

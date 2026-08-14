@@ -139,6 +139,22 @@ function Content({ api, ui }: ViewExtensionProps) {
         <div className="p-8 text-center text-sm text-muted-foreground">Loading view...</div>
       )}
 
+      {!loadingBoards && !activeBoard && (
+        <div className="flex-1 flex flex-col items-center justify-center p-12 text-center border border-dashed border-border rounded-xl">
+          <h3 className="text-base font-semibold text-foreground mb-1">No Omniboards Found</h3>
+          <p className="text-sm text-muted-foreground max-w-md mb-4">
+            Create a multi-project Kanban board to aggregate and organize tasks across PACA projects.
+          </p>
+          <button
+            type="button"
+            onClick={handleCreateBoard}
+            className="h-9 px-4 flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Create Board
+          </button>
+        </div>
+      )}
+
       {!loadingBoards && activeBoard && (
         <div className="flex-1 overflow-hidden">
           <KanbanBoard
