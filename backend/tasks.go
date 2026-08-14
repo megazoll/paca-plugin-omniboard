@@ -77,9 +77,24 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	}
 	board := parseBoardRows(rows)[0]
 
-	buildQuery := func(useImportance bool, qualifyID bool) (string, []any) {
+	type assigneeStrategy int
+	const (
+		assigneeTaskAssigneesMember assigneeStrategy = iota
+		assigneeTaskAssigneesProjectMember
+		assigneeTaskAssigneesUser
+		assigneeTasksAssigneeID
+		assigneeNone
+	)
+
+	type queryConfig struct {
+		assigneeStrategy assigneeStrategy
+		useImportance    bool
+		qualifyID        bool
+	}
+
+	buildQuery := func(cfg queryConfig) (string, []any) {
 		prioritySelect := "COALESCE(t.priority, 'medium') AS priority"
-		if useImportance {
+		if cfg.useImportance {
 			prioritySelect = `CASE 
 				WHEN t.importance >= 3 THEN 'urgent' 
 				WHEN t.importance = 2 THEN 'high' 
@@ -88,15 +103,35 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			END AS priority`
 		}
 
+		var assigneeIDSelect, assigneeNameSelect, extraJoin string
+		switch cfg.assigneeStrategy {
+		case assigneeTaskAssigneesMember:
+			assigneeIDSelect = "(SELECT ta.member_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+		case assigneeTaskAssigneesProjectMember:
+			assigneeIDSelect = "(SELECT ta.project_member_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+		case assigneeTaskAssigneesUser:
+			assigneeIDSelect = "(SELECT ta.user_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+		case assigneeTasksAssigneeID:
+			assigneeIDSelect = "t.assignee_id AS assignee_id"
+			assigneeNameSelect = "COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name"
+			extraJoin = "LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id LEFT JOIN users u ON t.assignee_id = u.id"
+		case assigneeNone:
+			assigneeIDSelect = "NULL AS assignee_id"
+			assigneeNameSelect = "'' AS assignee_name"
+		}
+
 		whereID := "WHERE t.id IS NOT NULL"
-		if !qualifyID {
+		if !cfg.qualifyID {
 			whereID = "WHERE id IS NOT NULL"
 		}
 
-		sqlParts := []string{
-			fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, t.assignee_id, COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id LEFT JOIN users u ON t.assignee_id = u.id %s`, prioritySelect, whereID),
-		}
+		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
+			assigneeIDSelect, assigneeNameSelect, prioritySelect, extraJoin, whereID)
 
+		sqlParts := []string{baseSQL}
 		args := []any{}
 		argIdx := 1
 
@@ -130,15 +165,30 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		// Filter by assignee if provided in query params
 		filterAssignee := req.QueryParam("assigneeId")
 		if filterAssignee != "" {
-			sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
-			args = append(args, filterAssignee)
-			argIdx++
+			switch cfg.assigneeStrategy {
+			case assigneeTaskAssigneesMember:
+				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.member_id = $%d)", argIdx))
+				args = append(args, filterAssignee)
+				argIdx++
+			case assigneeTaskAssigneesProjectMember:
+				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.project_member_id = $%d)", argIdx))
+				args = append(args, filterAssignee)
+				argIdx++
+			case assigneeTaskAssigneesUser:
+				sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $%d)", argIdx))
+				args = append(args, filterAssignee)
+				argIdx++
+			case assigneeTasksAssigneeID:
+				sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
+				args = append(args, filterAssignee)
+				argIdx++
+			}
 		}
 
 		// Filter by priority if provided in query params
 		filterPriority := req.QueryParam("priority")
 		if filterPriority != "" {
-			if useImportance {
+			if cfg.useImportance {
 				switch strings.ToLower(filterPriority) {
 				case "urgent":
 					sqlParts = append(sqlParts, "AND t.importance >= 3")
@@ -159,25 +209,30 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		return strings.Join(sqlParts, " "), args
 	}
 
-	// Try sequence:
-	// 1. PostgreSQL production (qualify t.id, t.importance)
-	// 2. PostgreSQL production with priority column (qualify t.id, t.priority)
-	// 3. Mock/SQLite test context (unqualified id, t.importance)
-	// 4. Mock/SQLite test context (unqualified id, t.priority)
-	var taskRows *plugin.DBQueryResult
-
-	attempts := []struct {
-		useImportance bool
-		qualifyID     bool
-	}{
-		{useImportance: true, qualifyID: true},
-		{useImportance: false, qualifyID: true},
-		{useImportance: true, qualifyID: false},
-		{useImportance: false, qualifyID: false},
+	assigneeStrategies := []assigneeStrategy{
+		assigneeTaskAssigneesMember,
+		assigneeTaskAssigneesProjectMember,
+		assigneeTaskAssigneesUser,
+		assigneeTasksAssigneeID,
+		assigneeNone,
 	}
 
+	var attempts []queryConfig
+	for _, strat := range assigneeStrategies {
+		for _, imp := range []bool{true, false} {
+			for _, qual := range []bool{true, false} {
+				attempts = append(attempts, queryConfig{
+					assigneeStrategy: strat,
+					useImportance:    imp,
+					qualifyID:        qual,
+				})
+			}
+		}
+	}
+
+	var taskRows *plugin.DBQueryResult
 	for _, att := range attempts {
-		q, args := buildQuery(att.useImportance, att.qualifyID)
+		q, args := buildQuery(att)
 		taskRows, err = p.db.Query(q, args...)
 		if err == nil && taskRows != nil {
 			break
