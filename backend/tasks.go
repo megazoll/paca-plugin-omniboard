@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	plugin "github.com/Paca-AI/plugin-sdk-go"
@@ -107,16 +108,16 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		var assigneeIDSelect, assigneeNameSelect, extraJoin string
 		switch cfg.assigneeStrategy {
 		case assigneeTaskAssigneesMember:
-			assigneeIDSelect = "(SELECT ta.member_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 		case assigneeTaskAssigneesProjectMember:
-			assigneeIDSelect = "(SELECT ta.project_member_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.project_member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 		case assigneeTaskAssigneesUser:
-			assigneeIDSelect = "(SELECT ta.user_id FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeIDSelect = "(SELECT ta.user_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 		case assigneeTasksAssigneeID:
-			assigneeIDSelect = "t.assignee_id AS assignee_id"
+			assigneeIDSelect = "COALESCE(pm.user_id::text, t.assignee_id::text) AS assignee_id"
 			assigneeNameSelect = "COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name"
 			extraJoin = "LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id LEFT JOIN users u ON t.assignee_id = u.id"
 		case assigneeNone:
@@ -129,7 +130,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			whereID = "WHERE id IS NOT NULL"
 		}
 
-		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
+		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.parent_task_id::text AS parent_task_id, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
 			assigneeIDSelect, assigneeNameSelect, prioritySelect, extraJoin, whereID)
 
 		sqlParts := []string{baseSQL}
@@ -163,6 +164,32 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			argIdx++
 		}
 
+		// Filter out subtasks if hide_subtasks is enabled on board or requested
+		hideSubtasks := false
+		if hs, ok := board.Filters["hide_subtasks"].(bool); ok && hs {
+			hideSubtasks = true
+		}
+		if req.QueryParam("hideSubtasks") == "true" {
+			hideSubtasks = true
+		}
+		if hideSubtasks {
+			sqlParts = append(sqlParts, "AND t.parent_task_id IS NULL")
+		}
+
+		// Filter out old completed tasks if done_retention_days is configured
+		var doneRetentionDays int
+		if d, ok := board.Filters["done_retention_days"].(float64); ok && d > 0 {
+			doneRetentionDays = int(d)
+		}
+		if dStr := req.QueryParam("doneRetentionDays"); dStr != "" {
+			if dInt, err := strconv.Atoi(dStr); err == nil && dInt > 0 {
+				doneRetentionDays = dInt
+			}
+		}
+		if doneRetentionDays > 0 {
+			sqlParts = append(sqlParts, fmt.Sprintf("AND (COALESCE(ts.category, '') NOT IN ('done', 'completed', 'closed', 'resolved') OR t.updated_at >= NOW() - INTERVAL '%d days')", doneRetentionDays))
+		}
+
 		// Filter by assignee if provided in query params
 		filterAssignee := req.QueryParam("assigneeId")
 		if filterAssignee != "" {
@@ -176,19 +203,19 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			} else {
 				switch cfg.assigneeStrategy {
 				case assigneeTaskAssigneesMember:
-					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.member_id = $%d)", argIdx))
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id LEFT JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id AND (pm.user_id::text = $%d OR ta.member_id::text = $%d OR u.full_name = $%d OR u.username = $%d))", argIdx, argIdx, argIdx, argIdx))
 					args = append(args, filterAssignee)
 					argIdx++
 				case assigneeTaskAssigneesProjectMember:
-					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.project_member_id = $%d)", argIdx))
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id LEFT JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id AND (pm.user_id::text = $%d OR ta.project_member_id::text = $%d OR u.full_name = $%d OR u.username = $%d))", argIdx, argIdx, argIdx, argIdx))
 					args = append(args, filterAssignee)
 					argIdx++
 				case assigneeTaskAssigneesUser:
-					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $%d)", argIdx))
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta LEFT JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id AND (ta.user_id::text = $%d OR u.full_name = $%d OR u.username = $%d))", argIdx, argIdx, argIdx))
 					args = append(args, filterAssignee)
 					argIdx++
 				case assigneeTasksAssigneeID:
-					sqlParts = append(sqlParts, fmt.Sprintf("AND t.assignee_id = $%d", argIdx))
+					sqlParts = append(sqlParts, fmt.Sprintf("AND (t.assignee_id::text = $%d OR pm.user_id::text = $%d OR u_pm.full_name = $%d OR u_pm.username = $%d OR u.full_name = $%d OR u.username = $%d)", argIdx, argIdx, argIdx, argIdx, argIdx, argIdx))
 					args = append(args, filterAssignee)
 					argIdx++
 				}
@@ -275,6 +302,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 				AssigneeID:     sc.strPtr("assignee_id"),
 				AssigneeName:   sc.str("assignee_name"),
 				Priority:       sc.str("priority"),
+				ParentTaskID:   sc.strPtr("parent_task_id"),
 				CreatedAt:      sc.str("created_at"),
 				UpdatedAt:      sc.str("updated_at"),
 			})

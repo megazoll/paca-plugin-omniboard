@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Plus, Trash2, Check, LayoutGrid } from "lucide-react";
+import { X, Plus, Trash2, Check, LayoutGrid, Sliders } from "lucide-react";
 import type { ColumnConfig, Omniboard, ProjectInfo, StatusInfo } from "../types";
 
 interface BoardSettingsModalProps {
@@ -13,6 +13,7 @@ interface BoardSettingsModalProps {
     description: string;
     project_ids: string[];
     column_config: ColumnConfig[];
+    filters: Record<string, any>;
   }) => void;
   onDelete?: () => void;
   isSaving?: boolean;
@@ -23,7 +24,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
   onClose,
   board,
   projects,
-  statuses,
+  statuses: _statuses,
   onSave,
   onDelete,
   isSaving,
@@ -32,6 +33,8 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
   const [description, setDescription] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
+  const [hideSubtasks, setHideSubtasks] = useState(false);
+  const [doneRetentionDays, setDoneRetentionDays] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -40,6 +43,8 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
       setName(board.name || "");
       setDescription(board.description || "");
       setSelectedProjectIds(board.project_ids || []);
+      setHideSubtasks(Boolean(board.filters?.hide_subtasks));
+      setDoneRetentionDays(Number(board.filters?.done_retention_days || 0));
       setColumns(
         board.column_config && board.column_config.length > 0
           ? board.column_config
@@ -54,6 +59,8 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
       setName("New Omniboard");
       setDescription("");
       setSelectedProjectIds([]);
+      setHideSubtasks(false);
+      setDoneRetentionDays(0);
       setColumns([
         { id: "col-backlog", title: "Backlog", status_categories: ["backlog"], color: "#64748b" },
         { id: "col-todo", title: "To Do", status_categories: ["todo"], color: "#eab308" },
@@ -108,6 +115,11 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
       description,
       project_ids: selectedProjectIds,
       column_config: columns,
+      filters: {
+        ...(board?.filters || {}),
+        hide_subtasks: hideSubtasks,
+        done_retention_days: doneRetentionDays,
+      },
     });
   };
 
@@ -135,7 +147,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* General Details */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               General Info
             </h3>
             <div>
@@ -164,7 +176,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
           {/* Projects Selector */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Target Projects ({selectedProjectIds.length === 0 ? "All Projects" : `${selectedProjectIds.length} Selected`})
               </h3>
               <button
@@ -208,10 +220,61 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
             )}
           </div>
 
+          {/* Display & Automation Rules */}
+          <div className="space-y-4 p-4 rounded-xl border border-border/60 bg-muted/15">
+            <div className="flex items-center gap-2">
+              <Sliders className="size-4 text-primary shrink-0" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Display & Automation Rules
+              </h3>
+            </div>
+
+            {/* Option 1: Hide Subtasks */}
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideSubtasks}
+                onChange={(e) => setHideSubtasks(e.target.checked)}
+                className="mt-0.5 rounded border-input text-primary focus:ring-primary size-4"
+              />
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium text-foreground block">
+                  Hide subtasks
+                </span>
+                <span className="text-xs text-muted-foreground block">
+                  Exclude subtasks and only display root parent tasks on the board.
+                </span>
+              </div>
+            </label>
+
+            {/* Option 2: Done retention period */}
+            <div className="pt-3 border-t border-border/40 space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">
+                Done tasks retention period
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Automatically hide tasks in Done columns if their last update was more than X days ago.
+              </p>
+              <select
+                value={doneRetentionDays}
+                onChange={(e) => setDoneRetentionDays(Number(e.target.value))}
+                className="w-full sm:w-80 py-1.5 px-2.5 text-xs bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+              >
+                <option value={0}>Show all completed tasks (No limit)</option>
+                <option value={1}>Hide completed older than 1 day</option>
+                <option value={3}>Hide completed older than 3 days</option>
+                <option value={7}>Hide completed older than 7 days (1 week)</option>
+                <option value={14}>Hide completed older than 14 days (2 weeks)</option>
+                <option value={30}>Hide completed older than 30 days (1 month)</option>
+                <option value={90}>Hide completed older than 90 days (3 months)</option>
+              </select>
+            </div>
+          </div>
+
           {/* Column Configuration */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Kanban Columns ({columns.length})
               </h3>
               <button

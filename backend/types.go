@@ -46,6 +46,7 @@ type CrossProjectTask struct {
 	AssigneeID     *string `json:"assignee_id"`
 	AssigneeName   string  `json:"assignee_name"`
 	Priority       string  `json:"priority"`
+	ParentTaskID   *string `json:"parent_task_id"`
 	CreatedAt      string  `json:"created_at"`
 	UpdatedAt      string  `json:"updated_at"`
 }

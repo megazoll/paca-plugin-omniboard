@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { ColumnConfig, CrossProjectTask, StatusInfo } from "../types";
 import { KanbanColumn } from "./KanbanColumn";
 
@@ -6,6 +6,7 @@ interface KanbanBoardProps {
   columns: ColumnConfig[];
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
+  boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
 }
@@ -21,6 +22,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: rawColumns,
   tasks: rawTasks,
   allStatuses,
+  boardFilters,
   onStatusChange,
   onCardClick,
 }) => {
@@ -28,6 +30,31 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const tasks = Array.isArray(rawTasks) ? rawTasks : [];
 
   const normalize = (str?: string) => (str || "").toLowerCase().replace(/[\s_-]/g, "");
+
+  const isTaskVisible = (t: CrossProjectTask): boolean => {
+    // 1. Hide subtasks rule
+    if (boardFilters?.hide_subtasks && t.parent_task_id) {
+      return false;
+    }
+    // 2. Done tasks retention period rule
+    const retentionDays = Number(boardFilters?.done_retention_days || 0);
+    if (retentionDays > 0) {
+      const cat = normalize(t.status_category);
+      const isDone = cat === "done" || cat === "completed" || cat === "closed" || cat === "resolved";
+      if (isDone && t.updated_at) {
+        const updatedTime = new Date(t.updated_at).getTime();
+        const cutoffTime = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
+        if (updatedTime < cutoffTime) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
+  const visibleTasks = useMemo(() => {
+    return tasks.filter(isTaskVisible);
+  }, [tasks, boardFilters]);
 
   const isTaskInColumn = (t: CrossProjectTask, col: ColumnConfig): boolean => {
     const taskCat = normalize(t.status_category);
@@ -58,7 +85,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // Helper to categorize tasks per column
   const getTasksForColumn = (col: ColumnConfig, colIndex: number) => {
-    return tasks.filter((t) => {
+    return visibleTasks.filter((t) => {
       if (isTaskInColumn(t, col)) return true;
 
       // If task does not match any column, put it in the first column as fallback

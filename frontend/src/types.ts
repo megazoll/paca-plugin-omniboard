@@ -60,6 +60,7 @@ export interface CrossProjectTask {
   assignee_id: string | null;
   assignee_name: string;
   priority: string;
+  parent_task_id?: string | null;
   created_at: string;
   updated_at: string;
 }

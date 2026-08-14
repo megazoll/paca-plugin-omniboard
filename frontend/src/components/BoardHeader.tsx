@@ -63,7 +63,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
             </h1>
             {boards.length > 1 && (
               <select
-                className="h-7 px-2 py-0.5 bg-muted/40 border border-border/40 rounded-md text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer ml-1"
+                className="px-2.5 py-1.5 bg-muted/40 border border-border/40 rounded-lg text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary/20 cursor-pointer ml-1"
                 value={activeBoard?.id || ""}
                 onChange={(e) => onSelectBoard(e.target.value)}
               >
@@ -104,7 +104,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className={`flex size-7.5 items-center justify-center rounded-lg border border-border/40 bg-muted/20 hover:bg-muted/40 transition-all duration-150 ${
+            className={`flex size-8 items-center justify-center rounded-lg border border-border/40 bg-muted/20 hover:bg-muted/40 transition-all duration-150 ${
               isFetching ? "animate-spin text-primary" : "text-muted-foreground/70 hover:text-foreground"
             }`}
             title="Refresh tasks"
@@ -114,9 +114,9 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
         </div>
       </div>
 
-      {/* Filter / Search Bar with generous spacing matching PACA system bar */}
+      {/* Filter / Search Bar with py-1.5 on all filter elements */}
       <div className="flex flex-wrap items-center gap-3 border-t border-border/20 bg-muted/10 px-6 py-2.5">
-        {/* Search Input - Wider with comfortable height */}
+        {/* Search Input */}
         <div className="relative flex items-center w-64 sm:w-80 md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50 pointer-events-none" />
           <input
@@ -124,7 +124,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
             placeholder="Search tasks..."
             value={filters.search || ""}
             onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            className="w-full h-8.5 pl-9 pr-8 text-xs bg-muted/25 border border-border/30 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+            className="w-full py-1.5 pl-9 pr-8 text-xs bg-muted/25 border border-border/30 rounded-lg placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
           />
           {filters.search && (
             <button
@@ -145,7 +145,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
             <select
               value={filters.projectId || ""}
               onChange={(e) => onFilterChange({ ...filters, projectId: e.target.value || undefined })}
-              className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[200px] truncate"
+              className="py-1.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[200px] truncate"
             >
               <option value="">All Projects ({boardProjects.length})</option>
               {boardProjects.map((p) => (
@@ -163,7 +163,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
           <select
             value={filters.assigneeId || ""}
             onChange={(e) => onFilterChange({ ...filters, assigneeId: e.target.value || undefined })}
-            className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[180px] truncate"
+            className="py-1.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer max-w-[180px] truncate"
           >
             <option value="">All Assignees</option>
             <option value="unassigned">Unassigned</option>
@@ -179,7 +179,7 @@ export const BoardHeader: React.FC<BoardHeaderProps> = ({
         <select
           value={filters.priority || ""}
           onChange={(e) => onFilterChange({ ...filters, priority: e.target.value || undefined })}
-          className="h-8.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+          className="py-1.5 px-2.5 text-xs bg-muted/25 border border-border/30 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
         >
           <option value="">All Priorities</option>
           <option value="urgent">Urgent</option>

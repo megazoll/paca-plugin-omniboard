@@ -4,7 +4,6 @@ import type { ViewExtensionProps } from "@paca-ai/plugin-sdk-react";
 import { BoardHeader } from "./components/BoardHeader";
 import { BoardSettingsModal } from "./components/BoardSettingsModal";
 import { KanbanBoard } from "./components/KanbanBoard";
-import { TaskDetailModal } from "./components/TaskDetailModal";
 import {
   useOmniboards,
   useOmniboardTasks,
@@ -44,7 +43,6 @@ function Content(props: ViewExtensionProps) {
   const [activeBoardId, setActiveBoardId] = useState<string>(getInitialBoardId);
   const [filters, setFilters] = useState<BoardFilters>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<CrossProjectTask | null>(null);
 
   const activeBoard = useMemo<Omniboard | null>(() => {
     if (activeBoardId) {
@@ -91,14 +89,21 @@ function Content(props: ViewExtensionProps) {
     refetch,
   } = useOmniboardTasks(api, currentBoardId, filters, scope);
 
+  // Extract unique assignees present on current board tasks (deduplicated by person)
   const assignees = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { id: string; name: string }>();
     for (const t of tasks) {
-      if (t.assignee_id && t.assignee_name) {
-        map.set(t.assignee_id, t.assignee_name);
+      if (t.assignee_name && t.assignee_name.trim()) {
+        const name = t.assignee_name.trim();
+        if (!map.has(name)) {
+          map.set(name, {
+            id: t.assignee_id || name,
+            name: name,
+          });
+        }
       }
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [tasks]);
 
   const createMutation = useCreateOmniboard(api, scope);
@@ -124,6 +129,7 @@ function Content(props: ViewExtensionProps) {
     description: string;
     project_ids: string[];
     column_config: ColumnConfig[];
+    filters: Record<string, any>;
   }) => {
     if (!currentBoardId) return;
     updateMutation.mutate(
@@ -131,6 +137,7 @@ function Content(props: ViewExtensionProps) {
       {
         onSuccess: () => {
           setIsSettingsOpen(false);
+          refetch();
           ui?.toast({ title: "Board settings saved", variant: "success" });
         },
       }
@@ -160,26 +167,17 @@ function Content(props: ViewExtensionProps) {
       {
         onSuccess: () => {
           ui?.toast({ title: "Task status updated", variant: "success" });
-          if (selectedTask && selectedTask.id === taskId) {
-            const foundStatus = statuses.find((s) => s.id === newStatusId);
-            setSelectedTask({
-              ...selectedTask,
-              status_id: newStatusId,
-              status_name: foundStatus?.name || selectedTask.status_name,
-            });
-          }
         },
       }
     );
   };
 
+  // Open native system TaskDetailModal via host handlers
   const handleCardClick = (task: CrossProjectTask) => {
-    setSelectedTask(task);
-  };
-
-  const handleOpenFullPage = (task: CrossProjectTask) => {
-    if (ui?.navigate) {
-      ui.navigate(`/projects/${task.project_id}/tasks/${task.id}`);
+    if ((props as any)?.onTaskClick) {
+      (props as any).onTaskClick(task);
+    } else if ((ui as any)?.openTask) {
+      (ui as any).openTask(task.id, task.project_id);
     }
   };
 
@@ -225,21 +223,12 @@ function Content(props: ViewExtensionProps) {
             columns={activeBoard.column_config || []}
             tasks={tasks}
             allStatuses={statuses}
+            boardFilters={activeBoard.filters}
             onStatusChange={handleStatusChange}
             onCardClick={handleCardClick}
           />
         </div>
       )}
-
-      {/* Task Detail Modal */}
-      <TaskDetailModal
-        task={selectedTask}
-        allStatuses={statuses}
-        isOpen={!!selectedTask}
-        onClose={() => setSelectedTask(null)}
-        onStatusChange={handleStatusChange}
-        onOpenFullPage={handleOpenFullPage}
-      />
 
       {/* Settings Modal */}
       <BoardSettingsModal
