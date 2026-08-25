@@ -66,6 +66,76 @@ func (p *omniboardPlugin) listStatuses(req *plugin.Request, res *plugin.Response
 	ok(res, statuses)
 }
 
+// listTaskTypes returns all task types across PACA projects or for a specific project.
+func (p *omniboardPlugin) listTaskTypes(req *plugin.Request, res *plugin.Response) {
+	projID := req.QueryParam("projectId")
+	if projID == "" {
+		projID = req.PathParam("projectId")
+	}
+
+	queries := []struct {
+		sql  string
+		args []any
+	}{
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT id, project_id, name, icon, color, description, is_default, is_system FROM task_types WHERE project_id = $1 ORDER BY created_at ASC`
+				}
+				return `SELECT id, project_id, name, icon, color, description, is_default, is_system FROM task_types ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT id, project_id, name, icon, color, description, is_default, is_system FROM task_types WHERE project_id = $1`
+				}
+				return `SELECT id, project_id, name, icon, color, description, is_default, is_system FROM task_types`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+	}
+
+	var rows *plugin.DBQueryResult
+	var err error
+	for _, q := range queries {
+		rows, err = p.db.Query(q.sql, q.args...)
+		if err == nil && rows != nil {
+			break
+		}
+	}
+
+	typesList := make([]TaskTypeItem, 0)
+	if err == nil && rows != nil {
+		for _, r := range rows.Rows {
+			sc := newRowScanner(rows.Columns, r)
+			typesList = append(typesList, TaskTypeItem{
+				ID:          sc.str("id"),
+				ProjectID:   sc.str("project_id"),
+				Name:        sc.str("name"),
+				Icon:        sc.str("icon"),
+				Color:       sc.str("color"),
+				Description: sc.str("description"),
+				IsDefault:   sc.boolVal("is_default"),
+				IsSystem:    sc.boolVal("is_system"),
+			})
+		}
+	}
+
+	ok(res, typesList)
+}
+
 // getBoardTasks queries cross-project tasks for a specific board based on its project filters.
 func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Response) {
 	boardID := req.PathParam("boardId")
@@ -89,6 +159,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 	type queryConfig struct {
 		assigneeStrategy assigneeStrategy
+		useTaskTypes     bool
 		useImportance    bool
 		qualifyID        bool
 		filterDeleted    bool
@@ -104,6 +175,13 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 				WHEN t.importance >= 1 THEN 'low' 
 				ELSE 'none' 
 			END AS priority`
+		}
+
+		taskTypeSelect := "t.task_type_id::text AS task_type_id, COALESCE(tt.name, '') AS task_type_name, COALESCE(tt.icon, '') AS task_type_icon, COALESCE(tt.color, '') AS task_type_color,"
+		taskTypeJoin := "LEFT JOIN task_types tt ON t.task_type_id = tt.id"
+		if !cfg.useTaskTypes {
+			taskTypeSelect = "NULL AS task_type_id, '' AS task_type_name, '' AS task_type_icon, '' AS task_type_color,"
+			taskTypeJoin = ""
 		}
 
 		var assigneeIDSelect, assigneeNameSelect, assigneesSelect, extraJoin string
@@ -178,8 +256,8 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			}
 		}
 
-		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, %s, t.parent_task_id::text AS parent_task_id, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
-			assigneeIDSelect, assigneeNameSelect, assigneesSelect, prioritySelect, extraJoin, whereID)
+		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, %s t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, %s, t.parent_task_id::text AS parent_task_id, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s %s`,
+			taskTypeSelect, assigneeIDSelect, assigneeNameSelect, assigneesSelect, prioritySelect, taskTypeJoin, extraJoin, whereID)
 
 		sqlParts := []string{baseSQL}
 		args := []any{}
@@ -306,15 +384,18 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 	var attempts []queryConfig
 	for _, strat := range assigneeStrategies {
-		for _, del := range []bool{true, false} {
-			for _, imp := range []bool{true, false} {
-				for _, qual := range []bool{true, false} {
-					attempts = append(attempts, queryConfig{
-						assigneeStrategy: strat,
-						useImportance:    imp,
-						qualifyID:        qual,
-						filterDeleted:    del,
-					})
+		for _, useTT := range []bool{true, false} {
+			for _, del := range []bool{true, false} {
+				for _, imp := range []bool{true, false} {
+					for _, qual := range []bool{true, false} {
+						attempts = append(attempts, queryConfig{
+							assigneeStrategy: strat,
+							useTaskTypes:     useTT,
+							useImportance:    imp,
+							qualifyID:        qual,
+							filterDeleted:    del,
+						})
+					}
 				}
 			}
 		}
@@ -379,6 +460,10 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 				ProjectName:    sc.str("project_name"),
 				ProjectPrefix:  sc.str("project_prefix"),
 				TaskNumber:     sc.intVal("task_number"),
+				TaskTypeID:     sc.strPtr("task_type_id"),
+				TaskTypeName:   sc.str("task_type_name"),
+				TaskTypeIcon:   sc.str("task_type_icon"),
+				TaskTypeColor:  sc.str("task_type_color"),
 				Title:          sc.str("title"),
 				Description:    sc.str("description"),
 				StatusID:       sc.strPtr("status_id"),
@@ -436,7 +521,7 @@ func (p *omniboardPlugin) listMembers(req *plugin.Request, res *plugin.Response)
 				if projID != "" {
 					return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = $1 ORDER BY name ASC`
 				}
-				return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id ORDER BY name ASC`
+				return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.deleted_at IS NULL ORDER BY name ASC`
 			}(),
 			args: func() []any {
 				if projID != "" {
@@ -573,4 +658,212 @@ func (p *omniboardPlugin) updateTaskStatus(req *plugin.Request, res *plugin.Resp
 	}
 
 	ok(res, map[string]any{"success": true})
+}
+
+// updateTaskType updates a task's task_type_id in PACA core database.
+func (p *omniboardPlugin) updateTaskType(req *plugin.Request, res *plugin.Response) {
+	taskID := req.PathParam("taskId")
+
+	var input struct {
+		TaskTypeID *string `json:"task_type_id"`
+	}
+	if err := json.Unmarshal(req.Body, &input); err != nil && len(req.Body) > 0 {
+		res.JSON(400, map[string]any{"error": "invalid json payload"})
+		return
+	}
+
+	var typeParam any = nil
+	if input.TaskTypeID != nil && *input.TaskTypeID != "" {
+		typeParam = *input.TaskTypeID
+	}
+
+	updateSQL := `UPDATE tasks SET task_type_id = $1, updated_at = $2 WHERE id = $3`
+	_, err := p.db.Exec(updateSQL, typeParam, nowStr(), taskID)
+	if err != nil {
+		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to update task type: %v", err)})
+		return
+	}
+
+	ok(res, map[string]any{"success": true})
+}
+
+// updateTaskDescription updates a task's description in PACA core database.
+func (p *omniboardPlugin) updateTaskDescription(req *plugin.Request, res *plugin.Response) {
+	taskID := req.PathParam("taskId")
+
+	var input struct {
+		Description *string `json:"description"`
+	}
+	if err := json.Unmarshal(req.Body, &input); err != nil && len(req.Body) > 0 {
+		res.JSON(400, map[string]any{"error": "invalid json payload"})
+		return
+	}
+
+	var descParam any = nil
+	if input.Description != nil {
+		descStr := strings.TrimSpace(*input.Description)
+		if descStr != "" {
+			if strings.HasPrefix(descStr, "[") || strings.HasPrefix(descStr, "{") {
+				descParam = descStr
+			} else {
+				// Convert plain text to block note JSON
+				lines := strings.Split(*input.Description, "\n")
+				type blockContent struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				}
+				type blockItem struct {
+					Type    string         `json:"type"`
+					Content []blockContent `json:"content,omitempty"`
+				}
+				blocks := make([]blockItem, 0, len(lines))
+				for _, line := range lines {
+					if line == "" {
+						blocks = append(blocks, blockItem{Type: "paragraph"})
+					} else {
+						blocks = append(blocks, blockItem{
+							Type:    "paragraph",
+							Content: []blockContent{{Type: "text", Text: line}},
+						})
+					}
+				}
+				bBytes, _ := json.Marshal(blocks)
+				descParam = string(bBytes)
+			}
+		}
+	}
+
+	updateSQL := `UPDATE tasks SET description = $1::jsonb, updated_at = $2 WHERE id = $3`
+	_, err := p.db.Exec(updateSQL, descParam, nowStr(), taskID)
+	if err != nil {
+		// Fallback for non-jsonb description column or mock InMemoryDB
+		updateSQL = `UPDATE tasks SET description = $1, updated_at = $2 WHERE id = $3`
+		_, err = p.db.Exec(updateSQL, descParam, nowStr(), taskID)
+	}
+	if err != nil {
+		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to update task description: %v", err)})
+		return
+	}
+
+	ok(res, map[string]any{"success": true})
+}
+
+// createTask creates a new task in a PACA project from omniboard.
+func (p *omniboardPlugin) createTask(req *plugin.Request, res *plugin.Response) {
+	var input struct {
+		ProjectID   string  `json:"project_id"`
+		Title       string  `json:"title"`
+		StatusID    *string `json:"status_id"`
+		TaskTypeID  *string `json:"task_type_id"`
+		Description string  `json:"description"`
+	}
+	if err := json.Unmarshal(req.Body, &input); err != nil && len(req.Body) > 0 {
+		res.JSON(400, map[string]any{"error": "invalid json payload"})
+		return
+	}
+
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		res.JSON(400, map[string]any{"error": "title is required"})
+		return
+	}
+
+	projectID := strings.TrimSpace(input.ProjectID)
+	if projectID == "" {
+		projectID = req.PathParam("projectId")
+	}
+	if projectID == "" {
+		res.JSON(400, map[string]any{"error": "project_id is required"})
+		return
+	}
+
+	// 1. Resolve status_id if not provided
+	statusID := input.StatusID
+	if statusID == nil || *statusID == "" {
+		rows, err := p.db.Query(`SELECT id FROM task_statuses WHERE project_id = $1 AND (is_default = true OR "default" = true) LIMIT 1`, projectID)
+		if err != nil || rows == nil || len(rows.Rows) == 0 {
+			rows, _ = p.db.Query(`SELECT id FROM task_statuses WHERE project_id = $1 ORDER BY position ASC LIMIT 1`, projectID)
+		}
+		if rows != nil && len(rows.Rows) > 0 {
+			sc := newRowScanner(rows.Columns, rows.Rows[0])
+			sid := sc.str("id")
+			if sid != "" {
+				statusID = &sid
+			}
+		}
+	}
+
+	// 2. Resolve task_type_id if not provided
+	taskTypeID := input.TaskTypeID
+	if taskTypeID == nil || *taskTypeID == "" {
+		rows, err := p.db.Query(`SELECT id FROM task_types WHERE project_id = $1 AND is_default = true LIMIT 1`, projectID)
+		if err != nil || rows == nil || len(rows.Rows) == 0 {
+			rows, _ = p.db.Query(`SELECT id FROM task_types WHERE project_id = $1 ORDER BY created_at ASC LIMIT 1`, projectID)
+		}
+		if rows != nil && len(rows.Rows) > 0 {
+			sc := newRowScanner(rows.Columns, rows.Rows[0])
+			ttid := sc.str("id")
+			if ttid != "" {
+				taskTypeID = &ttid
+			}
+		}
+	}
+
+	// 3. Atomically increment task_counters for this project
+	taskNumber := 1
+	counterQuery := "INSERT INTO task_counters (project_id, last_value) VALUES ($1, 1) ON CONFLICT (project_id) DO UPDATE SET last_value = task_counters.last_value + 1 RETURNING last_value"
+	counterRows, err := p.db.Query(counterQuery, projectID)
+	if err == nil && counterRows != nil && len(counterRows.Rows) > 0 {
+		sc := newRowScanner(counterRows.Columns, counterRows.Rows[0])
+		taskNumber = sc.intVal("last_value")
+	} else {
+		// Fallback if task_counters query fails
+		maxRows, err2 := p.db.Query("SELECT COALESCE(MAX(task_number), 0) + 1 AS next_num FROM tasks WHERE project_id = $1", projectID)
+		if err2 == nil && maxRows != nil && len(maxRows.Rows) > 0 {
+			sc := newRowScanner(maxRows.Columns, maxRows.Rows[0])
+			taskNumber = sc.intVal("next_num")
+		}
+	}
+
+	// 4. Insert into tasks
+	now := nowStr()
+	var statusParam any = nil
+	if statusID != nil && *statusID != "" {
+		statusParam = *statusID
+	}
+	var typeParam any = nil
+	if taskTypeID != nil && *taskTypeID != "" {
+		typeParam = *taskTypeID
+	}
+
+	insertSQL := "INSERT INTO tasks (project_id, task_number, task_type_id, status_id, title, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, project_id, task_number, task_type_id, status_id, title, created_at, updated_at"
+	insertRows, err := p.db.Query(insertSQL, projectID, taskNumber, typeParam, statusParam, title, now, now)
+	if err != nil {
+		// Fallback for tables without task_type_id column
+		fallbackSQL := "INSERT INTO tasks (project_id, task_number, status_id, title, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, project_id, task_number, status_id, title, created_at, updated_at"
+		insertRows, err = p.db.Query(fallbackSQL, projectID, taskNumber, statusParam, title, now, now)
+	}
+	if err != nil {
+		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to create task: %v", err)})
+		return
+	}
+
+	if len(insertRows.Rows) == 0 {
+		res.JSON(500, map[string]any{"error": "failed to return created task"})
+		return
+	}
+
+	sc := newRowScanner(insertRows.Columns, insertRows.Rows[0])
+	createdTask := map[string]any{
+		"id":           sc.str("id"),
+		"project_id":   sc.str("project_id"),
+		"task_number":  sc.intVal("task_number"),
+		"task_type_id": sc.strPtr("task_type_id"),
+		"status_id":    sc.strPtr("status_id"),
+		"title":        sc.str("title"),
+		"created_at":   sc.str("created_at"),
+		"updated_at":   sc.str("updated_at"),
+	}
+
+	created(res, createdTask)
 }

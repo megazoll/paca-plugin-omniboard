@@ -67,6 +67,10 @@ export interface CrossProjectTask {
   project_name: string;
   project_prefix: string;
   task_number: number;
+  task_type_id?: string | null;
+  task_type_name?: string | null;
+  task_type_icon?: string | null;
+  task_type_color?: string | null;
   title: string;
   description: string;
   status_id: string | null;
@@ -80,6 +84,17 @@ export interface CrossProjectTask {
   parent_task_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TaskTypeInfo {
+  id: string;
+  project_id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  is_default: boolean;
+  is_system: boolean;
 }
 
 export interface ProjectInfo {
@@ -98,3 +113,12 @@ export interface StatusInfo {
   position: number;
   is_default: boolean;
 }
+
+export interface CreateTaskInput {
+  project_id: string;
+  title: string;
+  status_id?: string | null;
+  task_type_id?: string | null;
+  description?: string;
+}
+

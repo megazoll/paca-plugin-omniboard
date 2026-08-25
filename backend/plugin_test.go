@@ -36,10 +36,10 @@ func setupPlugin(t *testing.T) *plugintest.Context {
 		},
 	)
 	tc.DB.SeedRows("tasks",
-		[]string{"id", "project_id", "task_number", "title", "description", "status_id", "assignee_id", "priority", "created_at", "updated_at"},
+		[]string{"id", "project_id", "task_number", "task_type_id", "title", "description", "status_id", "assignee_id", "priority", "created_at", "updated_at"},
 		[][]any{
-			{"task-1", testProjectID, 1, "First task", "Task description 1", "status-todo", "user-1", "high", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
-			{"task-2", testProjectID, 2, "Second task", "Task description 2", "status-done", nil, "medium", "2026-08-02T00:00:00Z", "2026-08-02T00:00:00Z"},
+			{"task-1", testProjectID, 1, "tt-1", "First task", "Task description 1", "status-todo", "user-1", "high", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+			{"task-2", testProjectID, 2, nil, "Second task", "Task description 2", "status-done", nil, "medium", "2026-08-02T00:00:00Z", "2026-08-02T00:00:00Z"},
 		},
 	)
 
@@ -385,6 +385,143 @@ func TestUpdateTaskAssignees(t *testing.T) {
 		t.Errorf("expected success=true")
 	}
 }
+
+func TestCreateTask(t *testing.T) {
+	tc := setupPlugin(t)
+
+	req := callerReq()
+	req.PathParams = map[string]string{"projectId": testProjectID}
+	req.Body = []byte(`{"project_id":"` + testProjectID + `","title":"Brand new task","status_id":"status-todo"}`)
+
+	res := tc.Call("POST", "/projects/"+testProjectID+"/omniboard/tasks", req)
+	if res.StatusCode != 201 {
+		t.Fatalf("expected 201, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !env.Success {
+		t.Errorf("expected success=true")
+	}
+	if env.Data["title"] != "Brand new task" {
+		t.Errorf("expected title 'Brand new task', got %v", env.Data["title"])
+	}
+	if env.Data["project_id"] != testProjectID {
+		t.Errorf("expected project_id '%s', got %v", testProjectID, env.Data["project_id"])
+	}
+}
+
+func TestCreateTask_Admin(t *testing.T) {
+	tc := setupPlugin(t)
+
+	req := callerReq()
+	req.Caller.CallerRole = "GLOBAL_ADMIN"
+	req.Caller.ProjectID = ""
+	req.Body = []byte(`{"project_id":"` + testProjectID + `","title":"Admin created task"}`)
+
+	res := tc.Call("POST", "/omniboard/admin-tasks", req)
+	if res.StatusCode != 201 {
+		t.Fatalf("expected 201, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if env.Data["title"] != "Admin created task" {
+		t.Errorf("expected title 'Admin created task', got %v", env.Data["title"])
+	}
+}
+
+func TestListTaskTypes(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("task_types",
+		[]string{"id", "project_id", "name", "icon", "color", "description", "is_default", "is_system", "created_at", "updated_at"},
+		[][]any{
+			{"tt-1", testProjectID, "Task", "CheckSquare", "#3b82f6", "Standard task", true, true, "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+			{"tt-2", testProjectID, "Bug", "Bug", "#ef4444", "Bug report", false, true, "2026-08-02T00:00:00Z", "2026-08-02T00:00:00Z"},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{"projectId": testProjectID}
+	res := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/task-types", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	typesList := decodeData[[]TaskTypeItem](t, res)
+	if len(typesList) != 2 {
+		t.Fatalf("expected 2 task types, got %d", len(typesList))
+	}
+	if typesList[0].Name != "Task" || typesList[1].Name != "Bug" {
+		t.Errorf("unexpected task types: %+v", typesList)
+	}
+}
+
+func TestUpdateTaskType(t *testing.T) {
+	tc := setupPlugin(t)
+
+	req := callerReq()
+	req.PathParams = map[string]string{"taskId": "task-1"}
+	req.Body = []byte(`{"task_type_id":"tt-2"}`)
+
+	res := tc.Call("PATCH", "/projects/"+testProjectID+"/omniboard/tasks/task-1/type", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !env.Success {
+		t.Errorf("expected success=true")
+	}
+}
+
+func TestUpdateTaskDescription(t *testing.T) {
+	tc := setupPlugin(t)
+
+	req := callerReq()
+	req.PathParams = map[string]string{"taskId": "task-1"}
+	req.Body = []byte(`{"description":"Updated description text"}`)
+
+	res := tc.Call("PATCH", "/projects/"+testProjectID+"/omniboard/tasks/task-1/description", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !env.Success {
+		t.Errorf("expected success=true")
+	}
+}
+
+
 
 
 

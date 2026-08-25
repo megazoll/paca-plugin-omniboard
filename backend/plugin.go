@@ -31,9 +31,13 @@ func (p *omniboardPlugin) Init(ctx *plugin.Context) error {
 	ctx.Route("DELETE", "/projects/:projectId/omniboard/boards/:boardId", p.deleteBoard)
 	ctx.Route("GET", "/projects/:projectId/omniboard/projects", p.listProjects)
 	ctx.Route("GET", "/projects/:projectId/omniboard/statuses", p.listStatuses)
+	ctx.Route("GET", "/projects/:projectId/omniboard/task-types", p.listTaskTypes)
 	ctx.Route("GET", "/projects/:projectId/omniboard/members", p.listMembers)
 	ctx.Route("GET", "/projects/:projectId/omniboard/boards/:boardId/tasks", p.getBoardTasks)
+	ctx.Route("POST", "/projects/:projectId/omniboard/tasks", p.createTask)
 	ctx.Route("PATCH", "/projects/:projectId/omniboard/tasks/:taskId/status", p.updateTaskStatus)
+	ctx.Route("PATCH", "/projects/:projectId/omniboard/tasks/:taskId/type", p.updateTaskType)
+	ctx.Route("PATCH", "/projects/:projectId/omniboard/tasks/:taskId/description", p.updateTaskDescription)
 	ctx.Route("PATCH", "/projects/:projectId/omniboard/tasks/:taskId/assignees", p.updateTaskAssignees)
 
 	// ── Admin-scope routes ──────────────────────────────────────────────────
@@ -44,9 +48,13 @@ func (p *omniboardPlugin) Init(ctx *plugin.Context) error {
 	ctx.Route("DELETE", "/omniboard/admin-boards/:boardId", p.deleteBoard)
 	ctx.Route("GET", "/omniboard/admin-projects", p.listProjects)
 	ctx.Route("GET", "/omniboard/admin-statuses", p.listStatuses)
+	ctx.Route("GET", "/omniboard/admin-task-types", p.listTaskTypes)
 	ctx.Route("GET", "/omniboard/admin-members", p.listMembers)
 	ctx.Route("GET", "/omniboard/admin-boards/:boardId/tasks", p.getBoardTasks)
+	ctx.Route("POST", "/omniboard/admin-tasks", p.createTask)
 	ctx.Route("PATCH", "/omniboard/admin-tasks/:taskId/status", p.updateTaskStatus)
+	ctx.Route("PATCH", "/omniboard/admin-tasks/:taskId/type", p.updateTaskType)
+	ctx.Route("PATCH", "/omniboard/admin-tasks/:taskId/description", p.updateTaskDescription)
 	ctx.Route("PATCH", "/omniboard/admin-tasks/:taskId/assignees", p.updateTaskAssignees)
 
 	return nil

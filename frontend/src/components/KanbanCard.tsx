@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { User } from "lucide-react";
 import type { ColumnConfig, CrossProjectTask, StatusInfo } from "../types";
 import { cn } from "../lib/utils";
+import { getTaskTypeIconComponent } from "./TaskTypeIcons";
 
 interface KanbanCardProps {
   task: CrossProjectTask;
@@ -42,6 +43,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   const taskKey = task.project_prefix
     ? `${task.project_prefix}-${task.task_number}`
     : `#${task.task_number}`;
+
+  const TaskTypeIcon = getTaskTypeIconComponent(task.task_type_icon);
 
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
   const assignees =
@@ -110,9 +113,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     >
       {/* Task Key (e.g. PROJ-123) matching PACA native format */}
       <div className="mb-1 flex items-center justify-between gap-1.5">
-        <span className="font-[JetBrains_Mono,monospace] text-xs font-semibold text-muted-foreground/50 tracking-wide">
-          {taskKey}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {TaskTypeIcon && (
+            <TaskTypeIcon
+              className="size-3 shrink-0"
+              style={task.task_type_color ? { color: task.task_type_color } : undefined}
+            />
+          )}
+          <span className="font-[JetBrains_Mono,monospace] text-xs font-semibold text-muted-foreground/50 tracking-wide">
+            {taskKey}
+          </span>
+        </div>
       </div>
 
       {/* Task Title */}

@@ -52,6 +52,10 @@ type CrossProjectTask struct {
 	ProjectName    string         `json:"project_name"`
 	ProjectPrefix  string         `json:"project_prefix"`
 	TaskNumber     int            `json:"task_number"`
+	TaskTypeID     *string        `json:"task_type_id"`
+	TaskTypeName   string         `json:"task_type_name"`
+	TaskTypeIcon   string         `json:"task_type_icon"`
+	TaskTypeColor  string         `json:"task_type_color"`
 	Title          string         `json:"title"`
 	Description    string         `json:"description"`
 	StatusID       *string        `json:"status_id"`
@@ -65,6 +69,18 @@ type CrossProjectTask struct {
 	ParentTaskID   *string        `json:"parent_task_id"`
 	CreatedAt      string         `json:"created_at"`
 	UpdatedAt      string         `json:"updated_at"`
+}
+
+// TaskTypeItem summary for UI task type configuration.
+type TaskTypeItem struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"project_id"`
+	Name        string `json:"name"`
+	Icon        string `json:"icon"`
+	Color       string `json:"color"`
+	Description string `json:"description"`
+	IsDefault   bool   `json:"is_default"`
+	IsSystem    bool   `json:"is_system"`
 }
 
 // ProjectItem summary for UI dropdowns.

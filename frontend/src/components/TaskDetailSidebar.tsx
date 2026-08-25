@@ -10,17 +10,22 @@ import {
   FileText,
   Copy,
   Check,
-  Plus,
+  Edit2,
+  Save,
 } from "lucide-react";
-import type { CrossProjectTask, ProjectMember, StatusInfo } from "../types";
+import type { CrossProjectTask, ProjectMember, StatusInfo, TaskTypeInfo } from "../types";
+import { TaskTypeSelector } from "./TaskTypeSelector";
 
 interface TaskDetailSidebarProps {
   task: CrossProjectTask | null;
   isOpen: boolean;
   onClose: () => void;
   allStatuses: StatusInfo[];
+  taskTypes?: TaskTypeInfo[];
   members?: ProjectMember[];
   onStatusChange: (taskId: string, newStatusId: string) => void;
+  onTypeChange?: (taskId: string, newTypeId: string) => void;
+  onDescriptionChange?: (taskId: string, newDescription: string) => void;
   onAssigneesChange?: (taskId: string, memberIds: string[]) => void;
   onNavigateToTask?: (projectId: string, taskId: string) => void;
 }
@@ -30,23 +35,69 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
   isOpen,
   onClose,
   allStatuses,
+  taskTypes = [],
   members = [],
   onStatusChange,
+  onTypeChange,
+  onDescriptionChange,
   onAssigneesChange,
   onNavigateToTask,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [descValue, setDescValue] = useState("");
+  const [isSavingDesc, setIsSavingDesc] = useState(false);
 
-  // Close on Escape key press
+  // Helper to extract human-readable text if description is stored as BlockNote JSON
+  const formatDescription = (rawDesc?: string): string => {
+    if (!rawDesc || !rawDesc.trim()) return "";
+    const trimmed = rawDesc.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const extractBlockText = (b: any): string => {
+            if (!b) return "";
+            if (typeof b === "string") return b;
+            if (Array.isArray(b.content)) {
+              return b.content.map((c: any) => c.text || c.title || "").join("");
+            }
+            if (b.text) return b.text;
+            return "";
+          };
+          const lines = parsed.map(extractBlockText).filter(Boolean);
+          if (lines.length > 0) return lines.join("\n\n");
+        }
+      } catch {
+        // Fallback to raw string if JSON parse fails
+      }
+    }
+    return rawDesc;
+  };
+
+  // Sync descValue when task changes or sidebar opens
+  useEffect(() => {
+    if (task) {
+      setDescValue(formatDescription(task.description));
+      setIsEditingDesc(false);
+    }
+  }, [task?.id, task?.description, isOpen]);
+
+  // Close on Escape key press (unless editing description)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
-        onClose();
+        if (isEditingDesc) {
+          setIsEditingDesc(false);
+          setDescValue(formatDescription(task?.description));
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isEditingDesc, task?.description]);
 
   if (!isOpen || !task) return null;
 
@@ -58,6 +109,17 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleSaveDescription = async () => {
+    if (!onDescriptionChange) return;
+    try {
+      setIsSavingDesc(true);
+      await onDescriptionChange(task.id, descValue);
+      setIsEditingDesc(false);
+    } finally {
+      setIsSavingDesc(false);
+    }
   };
 
   const getPriorityMeta = (priority?: string) => {
@@ -99,35 +161,9 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
     }
   };
 
-  // Helper to extract human-readable text if description is stored as BlockNote JSON
-  const formatDescription = (rawDesc?: string): string => {
-    if (!rawDesc || !rawDesc.trim()) return "";
-    const trimmed = rawDesc.trim();
-    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          const extractBlockText = (b: any): string => {
-            if (!b) return "";
-            if (typeof b === "string") return b;
-            if (Array.isArray(b.content)) {
-              return b.content.map((c: any) => c.text || c.title || "").join("");
-            }
-            if (b.text) return b.text;
-            return "";
-          };
-          const lines = parsed.map(extractBlockText).filter(Boolean);
-          if (lines.length > 0) return lines.join("\n\n");
-        }
-      } catch {
-        // Fallback to raw string if JSON parse fails
-      }
-    }
-    return rawDesc;
-  };
-
   const formattedDesc = formatDescription(task.description);
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
+  const projectTaskTypes = taskTypes.filter((tt) => !tt.project_id || tt.project_id === task.project_id);
 
   // Available project members
   const projectMembers = members.filter((m) => !m.project_id || m.project_id === task.project_id);
@@ -175,10 +211,22 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
       >
         {/* Header Bar */}
         <div className="flex items-center justify-between gap-3 border-b border-border/40 bg-muted/20 px-6 py-4">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
             <span className="font-[JetBrains_Mono,monospace] text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-md shrink-0">
               {taskKey}
             </span>
+
+            {/* Task Type Badge with Dropdown */}
+            <TaskTypeSelector
+              taskTypes={projectTaskTypes}
+              value={task.task_type_id}
+              fallbackName={task.task_type_name}
+              fallbackIcon={task.task_type_icon}
+              fallbackColor={task.task_type_color}
+              onChange={(typeId) => onTypeChange?.(task.id, typeId)}
+              canEdit={!!onTypeChange}
+            />
+
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground truncate">
               <Layers className="size-3.5 shrink-0" />
               <span className="font-medium text-foreground truncate">{task.project_name}</span>
@@ -361,24 +409,99 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
             </div>
           </div>
 
-          {/* Description Section with comfortable scroll container */}
+          {/* Description Section with Editable view */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <FileText className="size-4 text-primary shrink-0" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Description
-              </h3>
-            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="size-4 text-primary shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Description
+                </h3>
+              </div>
 
-            <div className="p-4 rounded-xl border border-border/40 bg-muted/10 text-sm text-foreground/90 leading-relaxed min-h-[140px] max-h-[380px] overflow-y-auto whitespace-pre-wrap break-words">
-              {formattedDesc ? (
-                formattedDesc
-              ) : (
-                <span className="italic text-muted-foreground/60 text-xs">
-                  No description provided for this task.
-                </span>
+              {onDescriptionChange && !isEditingDesc && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingDesc(true)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium px-2 py-0.5 rounded-md hover:bg-primary/10 transition-colors"
+                >
+                  <Edit2 className="size-3" />
+                  <span>Edit</span>
+                </button>
               )}
             </div>
+
+            {isEditingDesc ? (
+              <div className="space-y-2 animate-in fade-in-50 duration-150">
+                <textarea
+                  value={descValue}
+                  onChange={(e) => setDescValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      handleSaveDescription();
+                    }
+                  }}
+                  placeholder="Add a detailed description..."
+                  className="w-full min-h-[140px] max-h-[380px] p-3 text-sm bg-background border border-input rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y leading-relaxed font-sans"
+                  autoFocus
+                />
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground">
+                    <kbd className="px-1 py-0.5 text-[10px] bg-muted border border-border/60 rounded font-mono">⌘/Ctrl+Enter</kbd> to save
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSavingDesc}
+                      onClick={() => {
+                        setIsEditingDesc(false);
+                        setDescValue(formattedDesc);
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border/60 bg-muted/30 text-foreground hover:bg-muted/60 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingDesc}
+                      onClick={handleSaveDescription}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {isSavingDesc ? (
+                        <span>Saving...</span>
+                      ) : (
+                        <>
+                          <Save className="size-3.5" />
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => {
+                  if (onDescriptionChange) {
+                    setIsEditingDesc(true);
+                  }
+                }}
+                className={`p-4 rounded-xl border border-border/40 bg-muted/10 text-sm text-foreground/90 leading-relaxed min-h-[140px] max-h-[380px] overflow-y-auto whitespace-pre-wrap break-words transition-colors ${
+                  onDescriptionChange ? "hover:border-border hover:bg-muted/15 cursor-pointer group" : ""
+                }`}
+                title={onDescriptionChange ? "Click to edit description" : undefined}
+              >
+                {formattedDesc ? (
+                  formattedDesc
+                ) : (
+                  <span className="italic text-muted-foreground/60 text-xs">
+                    {onDescriptionChange ? "No description provided. Click to add one." : "No description provided for this task."}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -402,3 +525,4 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
     </>
   );
 };
+

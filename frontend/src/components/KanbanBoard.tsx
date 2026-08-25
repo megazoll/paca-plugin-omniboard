@@ -1,14 +1,17 @@
 import React, { useMemo } from "react";
-import type { ColumnConfig, CrossProjectTask, StatusInfo } from "../types";
+import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo } from "../types";
 import { KanbanColumn } from "./KanbanColumn";
 
 interface KanbanBoardProps {
   columns: ColumnConfig[];
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
+  projects?: ProjectInfo[];
+  defaultProjectId?: string;
   boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
+  onCreateTask?: (title: string, projectId: string, column: ColumnConfig) => Promise<void> | void;
 }
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -22,9 +25,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: rawColumns,
   tasks: rawTasks,
   allStatuses,
+  projects = [],
+  defaultProjectId,
   boardFilters,
   onStatusChange,
   onCardClick,
+  onCreateTask,
 }) => {
   const columns = Array.isArray(rawColumns) && rawColumns.length > 0 ? rawColumns : DEFAULT_COLUMNS;
   const tasks = Array.isArray(rawTasks) ? rawTasks : [];
@@ -108,12 +114,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             column={col}
             tasks={colTasks}
             allStatuses={allStatuses}
+            projects={projects}
+            defaultProjectId={defaultProjectId}
             boardFilters={boardFilters}
             onStatusChange={onStatusChange}
             onCardClick={onCardClick}
+            onCreateTask={onCreateTask}
           />
         );
       })}
     </div>
   );
 };
+

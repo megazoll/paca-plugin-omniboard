@@ -1,23 +1,30 @@
 import React from "react";
-import type { ColumnConfig, CrossProjectTask, StatusInfo } from "../types";
+import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo } from "../types";
 import { KanbanCard } from "./KanbanCard";
+import { AddTaskRow } from "./AddTaskRow";
 
 interface KanbanColumnProps {
   column: ColumnConfig;
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
+  projects?: ProjectInfo[];
+  defaultProjectId?: string;
   boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
+  onCreateTask?: (title: string, projectId: string, column: ColumnConfig) => Promise<void> | void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   column,
   tasks,
   allStatuses,
+  projects = [],
+  defaultProjectId,
   boardFilters,
   onStatusChange,
   onCardClick,
+  onCreateTask,
 }) => {
   return (
     <div className="flex w-72 shrink-0 flex-col gap-2.5">
@@ -58,7 +65,16 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             onCardClick={onCardClick}
           />
         ))}
+        {onCreateTask && projects.length > 0 && (
+          <AddTaskRow
+            variant="board"
+            projects={projects}
+            defaultProjectId={defaultProjectId}
+            onAdd={(title, projectId) => onCreateTask(title, projectId, column)}
+          />
+        )}
       </div>
     </div>
   );
 };
+

@@ -10,13 +10,18 @@ import {
   useOmniboardTasks,
   useOmniboardProjects,
   useOmniboardStatuses,
+  useOmniboardTaskTypes,
   useOmniboardMembers,
   useCreateOmniboard,
   useUpdateOmniboard,
   useDeleteOmniboard,
   useUpdateTaskStatus,
+  useUpdateTaskType,
+  useUpdateTaskDescription,
   useUpdateTaskAssignees,
+  useCreateOmniboardTask,
 } from "./api";
+import { resolveStatusForColumn } from "./lib/utils";
 import type { BoardFilters, Omniboard, ColumnConfig, CrossProjectTask } from "./types";
 
 export default function ProjectOmniboardPage(props: ProjectPageProps) {
@@ -33,6 +38,7 @@ function Content(props: ProjectPageProps) {
   const { data: boards = [], isLoading: loadingBoards } = useOmniboards(api, scope);
   const { data: projects = [] } = useOmniboardProjects(api, scope);
   const { data: statuses = [] } = useOmniboardStatuses(api, scope);
+  const { data: taskTypes = [] } = useOmniboardTaskTypes(api, scope);
   const { data: members = [] } = useOmniboardMembers(api, scope);
 
   // Initialize activeBoardId from URL search param if present
@@ -125,7 +131,52 @@ function Content(props: ProjectPageProps) {
   const updateMutation = useUpdateOmniboard(api, scope);
   const deleteMutation = useDeleteOmniboard(api, scope);
   const statusMutation = useUpdateTaskStatus(api, scope);
+  const typeMutation = useUpdateTaskType(api, scope);
+  const descriptionMutation = useUpdateTaskDescription(api, scope);
   const assigneesMutation = useUpdateTaskAssignees(api, scope);
+  const createTaskMutation = useCreateOmniboardTask(api, scope);
+
+  // Projects available on the active board
+  const boardProjects = useMemo(() => {
+    if (!activeBoard) return projects;
+    if (activeBoard.project_ids && activeBoard.project_ids.length > 0) {
+      return projects.filter((p) => activeBoard.project_ids.includes(p.id));
+    }
+    return projects;
+  }, [projects, activeBoard]);
+
+  const defaultProjectId = useMemo(() => {
+    if (filters.projectId) return filters.projectId;
+    if (api.projectId && boardProjects.some((p) => p.id === api.projectId)) {
+      return api.projectId;
+    }
+    return boardProjects.length > 0 ? boardProjects[0].id : "";
+  }, [filters.projectId, api.projectId, boardProjects]);
+
+  const handleCreateTask = async (
+    title: string,
+    projectId: string,
+    column: ColumnConfig
+  ) => {
+    const projectStatuses = statuses.filter((s) => s.project_id === projectId);
+    const targetStatusId = resolveStatusForColumn(projectStatuses, column);
+
+    try {
+      await createTaskMutation.mutateAsync({
+        project_id: projectId,
+        title,
+        status_id: targetStatusId,
+      });
+      ui?.toast({ title: "Task created", variant: "success" });
+    } catch (err: any) {
+      ui?.toast({
+        title: "Failed to create task",
+        description: err?.message || "An error occurred",
+        variant: "destructive",
+      });
+      throw err;
+    }
+  };
 
   const handleCreateBoard = () => {
     createMutation.mutate(
@@ -186,6 +237,48 @@ function Content(props: ProjectPageProps) {
         },
       }
     );
+  };
+
+  const handleTypeChange = async (taskId: string, newTypeId: string) => {
+    try {
+      await typeMutation.mutateAsync({ taskId, taskTypeId: newTypeId });
+      if (selectedTask && selectedTask.id === taskId) {
+        const tt = taskTypes.find((t) => t.id === newTypeId);
+        setSelectedTask({
+          ...selectedTask,
+          task_type_id: newTypeId,
+          task_type_name: tt?.name || selectedTask.task_type_name,
+          task_type_icon: tt?.icon || selectedTask.task_type_icon,
+          task_type_color: tt?.color || selectedTask.task_type_color,
+        });
+      }
+      ui?.toast({ title: "Task type updated", variant: "success" });
+    } catch (err: any) {
+      ui?.toast({
+        title: "Failed to update task type",
+        description: err?.message || "An error occurred",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDescriptionChange = async (taskId: string, newDescription: string) => {
+    try {
+      await descriptionMutation.mutateAsync({ taskId, description: newDescription });
+      if (selectedTask && selectedTask.id === taskId) {
+        setSelectedTask({
+          ...selectedTask,
+          description: newDescription,
+        });
+      }
+      ui?.toast({ title: "Task description updated", variant: "success" });
+    } catch (err: any) {
+      ui?.toast({
+        title: "Failed to update task description",
+        description: err?.message || "An error occurred",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAssigneesChange = (taskId: string, memberIds: string[]) => {
@@ -283,9 +376,12 @@ function Content(props: ProjectPageProps) {
             columns={activeBoard.column_config || []}
             tasks={tasks}
             allStatuses={statuses}
+            projects={boardProjects}
+            defaultProjectId={defaultProjectId}
             boardFilters={activeBoard.filters}
             onStatusChange={handleStatusChange}
             onCardClick={handleCardClick}
+            onCreateTask={handleCreateTask}
           />
         </div>
       )}
@@ -308,8 +404,11 @@ function Content(props: ProjectPageProps) {
         isOpen={!!selectedTask}
         onClose={() => setSelectedTask(null)}
         allStatuses={statuses}
+        taskTypes={taskTypes}
         members={members}
         onStatusChange={handleSidebarStatusChange}
+        onTypeChange={handleTypeChange}
+        onDescriptionChange={handleDescriptionChange}
         onAssigneesChange={handleAssigneesChange}
         onNavigateToTask={handleNavigateToTask}
       />

@@ -10,6 +10,7 @@ import type {
   ProjectInfo,
   ProjectMember,
   StatusInfo,
+  TaskTypeInfo,
   UpdateOmniboardInput,
 } from "./types";
 
@@ -34,6 +35,13 @@ function getStatusesPath(api: PluginApiClient, scope: OmniboardScope): string {
   return `/projects/${api.projectId}/omniboard/statuses`;
 }
 
+function getTaskTypesPath(api: PluginApiClient, scope: OmniboardScope, projectId?: string): string {
+  if (scope === "admin" || !api.projectId) {
+    return projectId ? `/omniboard/admin-task-types?projectId=${projectId}` : "/omniboard/admin-task-types";
+  }
+  return projectId ? `/projects/${api.projectId}/omniboard/task-types?projectId=${projectId}` : `/projects/${api.projectId}/omniboard/task-types`;
+}
+
 function getMembersPath(api: PluginApiClient, scope: OmniboardScope, projectId?: string): string {
   if (scope === "admin" || !api.projectId) {
     return projectId ? `/omniboard/admin-members?projectId=${projectId}` : "/omniboard/admin-members";
@@ -46,6 +54,20 @@ function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: 
     return `/omniboard/admin-tasks/${taskId}/status`;
   }
   return `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
+}
+
+function getTaskTypePath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
+  if (scope === "admin" || !api.projectId) {
+    return `/omniboard/admin-tasks/${taskId}/type`;
+  }
+  return `/projects/${api.projectId}/omniboard/tasks/${taskId}/type`;
+}
+
+function getTaskDescriptionPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
+  if (scope === "admin" || !api.projectId) {
+    return `/omniboard/admin-tasks/${taskId}/description`;
+  }
+  return `/projects/${api.projectId}/omniboard/tasks/${taskId}/description`;
 }
 
 function getTaskAssigneesPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
@@ -104,6 +126,15 @@ export function useOmniboardStatuses(api: PluginApiClient, scope: OmniboardScope
   return useQuery<StatusInfo[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "statuses", scope],
     queryFn: () => unwrapData<StatusInfo[]>(api.pluginGet(PLUGIN_ID, path)),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOmniboardTaskTypes(api: PluginApiClient, scope: OmniboardScope = "project", projectId?: string) {
+  const path = getTaskTypesPath(api, scope, projectId);
+  return useQuery<TaskTypeInfo[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "task-types", scope, projectId || "all"],
+    queryFn: () => unwrapData<TaskTypeInfo[]>(api.pluginGet(PLUGIN_ID, path)),
     staleTime: 60 * 1000,
   });
 }
@@ -187,6 +218,28 @@ export function useUpdateTaskStatus(api: PluginApiClient, scope: OmniboardScope 
   });
 }
 
+export function useUpdateTaskType(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, taskTypeId }: { taskId: string; taskTypeId: string | null }) =>
+      unwrapData<any>(api.pluginPatch(PLUGIN_ID, getTaskTypePath(api, scope, taskId), { task_type_id: taskTypeId })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
+    },
+  });
+}
+
+export function useUpdateTaskDescription(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, description }: { taskId: string; description: string }) =>
+      unwrapData<any>(api.pluginPatch(PLUGIN_ID, getTaskDescriptionPath(api, scope, taskId), { description })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
+    },
+  });
+}
+
 export function useUpdateTaskAssignees(api: PluginApiClient, scope: OmniboardScope = "project") {
   const qc = useQueryClient();
   return useMutation({
@@ -197,3 +250,24 @@ export function useUpdateTaskAssignees(api: PluginApiClient, scope: OmniboardSco
     },
   });
 }
+
+export function useCreateOmniboardTask(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const qc = useQueryClient();
+  const path =
+    scope === "admin" || !api.projectId
+      ? "/omniboard/admin-tasks"
+      : `/projects/${api.projectId}/omniboard/tasks`;
+  return useMutation({
+    mutationFn: (input: {
+      project_id: string;
+      title: string;
+      status_id?: string | null;
+      task_type_id?: string | null;
+      description?: string;
+    }) => unwrapData<any>(api.pluginPost(PLUGIN_ID, path, input)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
+    },
+  });
+}
+
