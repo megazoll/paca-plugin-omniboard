@@ -45,6 +45,11 @@ export interface UpdateOmniboardInput {
   filters?: Record<string, any>;
 }
 
+export interface TaskAssignee {
+  id: string;
+  name: string;
+}
+
 export interface CrossProjectTask {
   id: string;
   project_id: string;
@@ -59,6 +64,7 @@ export interface CrossProjectTask {
   status_color: string;
   assignee_id: string | null;
   assignee_name: string;
+  assignees?: TaskAssignee[];
   priority: string;
   parent_task_id?: string | null;
   created_at: string;

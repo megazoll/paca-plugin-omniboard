@@ -228,5 +228,80 @@ func TestAdminRoutes(t *testing.T) {
 	}
 }
 
+func TestGetBoardTasks_ExcludesDeletedTasks(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("omniboards",
+		[]string{"id", "project_id", "scope", "name", "description", "project_ids", "column_config", "filters", "created_by", "created_at", "updated_at"},
+		[][]any{
+			{"board-deleted-test", testProjectID, "project", "Omniboard Test", "Testing deleted tasks", "[]", "[]", "{}", "user-1", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+		},
+	)
+	tc.DB.SeedRows("projects",
+		[]string{"id", "name", "description", "task_id_prefix"},
+		[][]any{
+			{testProjectID, "Project One", "First test project", "P1"},
+		},
+	)
+	tc.DB.SeedRows("task_statuses",
+		[]string{"id", "project_id", "name", "color", "category", "position", "is_default"},
+		[][]any{
+			{"status-todo", testProjectID, "To Do", "#eab308", "todo", 1, true},
+		},
+	)
+	tc.DB.SeedRows("tasks",
+		[]string{"id", "project_id", "task_number", "title", "description", "status_id", "assignee_id", "priority", "created_at", "updated_at", "deleted_at"},
+		[][]any{
+			{"task-active", testProjectID, 1, "Active Task", "Desc", "status-todo", nil, "medium", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z", nil},
+			{"task-deleted", testProjectID, 2, "Deleted Task", "Desc", "status-todo", nil, "medium", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z", "2026-08-05T00:00:00Z"},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{"boardId": "board-deleted-test"}
+	res := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/boards/board-deleted-test/tasks", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	tasks := decodeData[[]CrossProjectTask](t, res)
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 active task, got %d", len(tasks))
+	}
+	if tasks[0].ID != "task-active" {
+		t.Errorf("expected 'task-active', got %q", tasks[0].ID)
+	}
+}
+
+func TestUpdateTaskStatus(t *testing.T) {
+	tc := setupPlugin(t)
+
+	req := callerReq()
+	req.PathParams = map[string]string{"taskId": "task-1"}
+	req.Body = []byte(`{"status_id":"status-done"}`)
+
+	res := tc.Call("PATCH", "/projects/"+testProjectID+"/omniboard/tasks/task-1/status", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !env.Success {
+		t.Errorf("expected success=true")
+	}
+}
+
+
 
 

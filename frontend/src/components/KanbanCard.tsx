@@ -39,6 +39,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     ? `${task.project_prefix}-${task.task_number}`
     : `#${task.task_number}`;
 
+  const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
+  const assignees =
+    task.assignees && task.assignees.length > 0
+      ? task.assignees
+      : task.assignee_name
+        ? [{ id: task.assignee_id || "1", name: task.assignee_name }]
+        : [];
+
   return (
     <div
       onClick={() => onCardClick?.(task)}
@@ -80,18 +88,21 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           <div onClick={(e) => e.stopPropagation()}>
             <select
               value={task.status_id || ""}
-              onChange={(e) => onStatusChange(task.id, e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val && val !== task.status_id) {
+                  onStatusChange(task.id, val);
+                }
+              }}
               className="h-5 text-[11px] px-1 py-0 bg-muted/40 border border-border/30 rounded text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer transition-colors max-w-[120px] truncate"
               title="Change status"
             >
-              {allStatuses
-                .filter((s) => s.project_id === task.project_id)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              {allStatuses.length === 0 && (
+              {projectStatuses.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              {(!task.status_id || !projectStatuses.some((s) => s.id === task.status_id)) && (
                 <option value={task.status_id || ""}>
                   {task.status_name || "Status"}
                 </option>
@@ -100,22 +111,41 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           </div>
         </div>
 
-        {/* Assignee Avatar */}
-        <div
-          title={task.assignee_name || "Unassigned"}
-          className={cn(
-            "flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-border/25 shrink-0",
-            task.assignee_name
-              ? "bg-linear-to-br from-primary/20 to-primary/15 text-primary"
-              : "bg-linear-to-br from-muted/80 to-muted/40 text-muted-foreground"
-          )}
-        >
-          {task.assignee_name ? (
-            task.assignee_name.slice(0, 1).toUpperCase()
-          ) : (
+        {/* Assignees Avatars */}
+        {assignees.length === 0 ? (
+          <div
+            title="Unassigned"
+            className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-border/25 shrink-0 bg-linear-to-br from-muted/80 to-muted/40 text-muted-foreground"
+          >
             <User className="size-2.5" />
-          )}
-        </div>
+          </div>
+        ) : assignees.length === 1 ? (
+          <div
+            title={assignees[0].name}
+            className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-border/25 shrink-0 bg-linear-to-br from-primary/20 to-primary/15 text-primary"
+          >
+            {assignees[0].name.slice(0, 1).toUpperCase()}
+          </div>
+        ) : (
+          <div
+            title={assignees.map((a) => a.name).join(", ")}
+            className="flex items-center -space-x-1.5 shrink-0"
+          >
+            {assignees.slice(0, 3).map((a, idx) => (
+              <div
+                key={a.id || idx}
+                className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-card bg-linear-to-br from-primary/20 to-primary/15 text-primary shrink-0"
+              >
+                {a.name.slice(0, 1).toUpperCase()}
+              </div>
+            ))}
+            {assignees.length > 3 && (
+              <div className="flex size-5 items-center justify-center rounded-full text-[9px] font-bold ring-1 ring-card bg-muted text-muted-foreground shrink-0">
+                +{assignees.length - 3}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

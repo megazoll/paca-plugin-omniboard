@@ -92,7 +92,16 @@ function Content(props: ViewExtensionProps) {
   const assignees = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
     for (const t of tasks) {
-      if (t.assignee_name && t.assignee_name.trim()) {
+      if (t.assignees && t.assignees.length > 0) {
+        for (const a of t.assignees) {
+          if (a.name && a.name.trim()) {
+            const name = a.name.trim();
+            if (!map.has(name)) {
+              map.set(name, { id: a.id || name, name });
+            }
+          }
+        }
+      } else if (t.assignee_name && t.assignee_name.trim()) {
         const name = t.assignee_name.trim();
         if (!map.has(name)) {
           map.set(name, {

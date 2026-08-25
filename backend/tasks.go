@@ -91,6 +91,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		assigneeStrategy assigneeStrategy
 		useImportance    bool
 		qualifyID        bool
+		filterDeleted    bool
 	}
 
 	buildQuery := func(cfg queryConfig) (string, []any) {
@@ -105,33 +106,80 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			END AS priority`
 		}
 
-		var assigneeIDSelect, assigneeNameSelect, extraJoin string
+		var assigneeIDSelect, assigneeNameSelect, assigneesSelect, extraJoin string
 		switch cfg.assigneeStrategy {
 		case assigneeTaskAssigneesMember:
 			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneesSelect = `COALESCE((
+				SELECT json_agg(json_build_object(
+					'id', COALESCE(pm.user_id::text, ta.member_id::text),
+					'name', COALESCE(u.full_name, u.username, '')
+				))
+				FROM task_assignees ta
+				JOIN project_members pm ON ta.member_id = pm.id
+				JOIN users u ON pm.user_id = u.id
+				WHERE ta.task_id = t.id
+			), '[]'::json)::text AS assignees_json`
 		case assigneeTaskAssigneesProjectMember:
 			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.project_member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneesSelect = `COALESCE((
+				SELECT json_agg(json_build_object(
+					'id', COALESCE(pm.user_id::text, ta.project_member_id::text),
+					'name', COALESCE(u.full_name, u.username, '')
+				))
+				FROM task_assignees ta
+				JOIN project_members pm ON ta.project_member_id = pm.id
+				JOIN users u ON pm.user_id = u.id
+				WHERE ta.task_id = t.id
+			), '[]'::json)::text AS assignees_json`
 		case assigneeTaskAssigneesUser:
 			assigneeIDSelect = "(SELECT ta.user_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneesSelect = `COALESCE((
+				SELECT json_agg(json_build_object(
+					'id', ta.user_id::text,
+					'name', COALESCE(u.full_name, u.username, '')
+				))
+				FROM task_assignees ta
+				JOIN users u ON ta.user_id = u.id
+				WHERE ta.task_id = t.id
+			), '[]'::json)::text AS assignees_json`
 		case assigneeTasksAssigneeID:
 			assigneeIDSelect = "COALESCE(pm.user_id::text, t.assignee_id::text) AS assignee_id"
 			assigneeNameSelect = "COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name"
+			assigneesSelect = `COALESCE((
+				SELECT json_agg(json_build_object(
+					'id', COALESCE(pm2.user_id::text, t2.assignee_id::text),
+					'name', COALESCE(u_pm2.full_name, u_pm2.username, u2.full_name, u2.username, '')
+				))
+				FROM tasks t2
+				LEFT JOIN project_members pm2 ON t2.assignee_id = pm2.id
+				LEFT JOIN users u_pm2 ON pm2.user_id = u_pm2.id
+				LEFT JOIN users u2 ON t2.assignee_id = u2.id
+				WHERE t2.id = t.id AND t2.assignee_id IS NOT NULL
+			), '[]'::json)::text AS assignees_json`
 			extraJoin = "LEFT JOIN project_members pm ON t.assignee_id = pm.id LEFT JOIN users u_pm ON pm.user_id = u_pm.id LEFT JOIN users u ON t.assignee_id = u.id"
 		case assigneeNone:
 			assigneeIDSelect = "NULL AS assignee_id"
 			assigneeNameSelect = "'' AS assignee_name"
+			assigneesSelect = "'[]'::text AS assignees_json"
 		}
 
 		whereID := "WHERE t.id IS NOT NULL"
 		if !cfg.qualifyID {
 			whereID = "WHERE id IS NOT NULL"
 		}
+		if cfg.filterDeleted {
+			whereID = "WHERE t.deleted_at IS NULL"
+			if !cfg.qualifyID {
+				whereID = "WHERE deleted_at IS NULL"
+			}
+		}
 
-		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, t.parent_task_id::text AS parent_task_id, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
-			assigneeIDSelect, assigneeNameSelect, prioritySelect, extraJoin, whereID)
+		baseSQL := fmt.Sprintf(`SELECT t.id, t.project_id, p.name AS project_name, p.task_id_prefix AS project_prefix, t.task_number, t.title, COALESCE(t.description::text, '') AS description, t.status_id, COALESCE(ts.name, '') AS status_name, COALESCE(ts.category, '') AS status_category, COALESCE(ts.color, '#64748b') AS status_color, %s, %s, %s, %s, t.parent_task_id::text AS parent_task_id, t.created_at, t.updated_at FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN task_statuses ts ON t.status_id = ts.id %s %s`,
+			assigneeIDSelect, assigneeNameSelect, assigneesSelect, prioritySelect, extraJoin, whereID)
 
 		sqlParts := []string{baseSQL}
 		args := []any{}
@@ -258,13 +306,16 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 	var attempts []queryConfig
 	for _, strat := range assigneeStrategies {
-		for _, imp := range []bool{true, false} {
-			for _, qual := range []bool{true, false} {
-				attempts = append(attempts, queryConfig{
-					assigneeStrategy: strat,
-					useImportance:    imp,
-					qualifyID:        qual,
-				})
+		for _, del := range []bool{true, false} {
+			for _, imp := range []bool{true, false} {
+				for _, qual := range []bool{true, false} {
+					attempts = append(attempts, queryConfig{
+						assigneeStrategy: strat,
+						useImportance:    imp,
+						qualifyID:        qual,
+						filterDeleted:    del,
+					})
+				}
 			}
 		}
 	}
@@ -287,6 +338,36 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	if taskRows != nil {
 		for _, r := range taskRows.Rows {
 			sc := newRowScanner(taskRows.Columns, r)
+
+			var assignees []TaskAssignee
+			if err := sc.jsonVal("assignees_json", &assignees); err != nil {
+				assignees = nil
+			}
+			if len(assignees) == 0 && sc.str("assignee_name") != "" {
+				assignees = []TaskAssignee{
+					{
+						ID:   sc.str("assignee_id"),
+						Name: sc.str("assignee_name"),
+					},
+				}
+			}
+			if assignees == nil {
+				assignees = make([]TaskAssignee, 0)
+			}
+
+			// Ensure assignee_id and assignee_name are populated from first assignee if available
+			var assigneeID *string = sc.strPtr("assignee_id")
+			var assigneeName string = sc.str("assignee_name")
+			if len(assignees) > 0 {
+				if assigneeID == nil || *assigneeID == "" {
+					firstID := assignees[0].ID
+					assigneeID = &firstID
+				}
+				if assigneeName == "" {
+					assigneeName = assignees[0].Name
+				}
+			}
+
 			tasks = append(tasks, CrossProjectTask{
 				ID:             sc.str("id"),
 				ProjectID:      sc.str("project_id"),
@@ -299,8 +380,9 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 				StatusName:     sc.str("status_name"),
 				StatusCategory: sc.str("status_category"),
 				StatusColor:    sc.str("status_color"),
-				AssigneeID:     sc.strPtr("assignee_id"),
-				AssigneeName:   sc.str("assignee_name"),
+				AssigneeID:     assigneeID,
+				AssigneeName:   assigneeName,
+				Assignees:      assignees,
 				Priority:       sc.str("priority"),
 				ParentTaskID:   sc.strPtr("parent_task_id"),
 				CreatedAt:      sc.str("created_at"),
@@ -334,11 +416,11 @@ func (p *omniboardPlugin) updateTaskStatus(req *plugin.Request, res *plugin.Resp
 	}
 
 	updateSQL := `UPDATE tasks SET status_id = $1, updated_at = $2 WHERE id = $3`
-	_, err := p.db.Query(updateSQL, statusParam, nowStr(), taskID)
+	_, err := p.db.Exec(updateSQL, statusParam, nowStr(), taskID)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to update task status: %v", err)})
 		return
 	}
 
-	res.JSON(200, map[string]any{"success": true})
+	ok(res, map[string]any{"success": true})
 }

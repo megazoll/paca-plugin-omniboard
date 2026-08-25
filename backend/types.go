@@ -30,25 +30,32 @@ type ColumnConfig struct {
 	Color            string   `json:"color,omitempty"`
 }
 
+// TaskAssignee represents an assigned user on a task.
+type TaskAssignee struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // CrossProjectTask represents a task with attached project & status metadata.
 type CrossProjectTask struct {
-	ID             string  `json:"id"`
-	ProjectID      string  `json:"project_id"`
-	ProjectName    string  `json:"project_name"`
-	ProjectPrefix  string  `json:"project_prefix"`
-	TaskNumber     int     `json:"task_number"`
-	Title          string  `json:"title"`
-	Description    string  `json:"description"`
-	StatusID       *string `json:"status_id"`
-	StatusName     string  `json:"status_name"`
-	StatusCategory string  `json:"status_category"`
-	StatusColor    string  `json:"status_color"`
-	AssigneeID     *string `json:"assignee_id"`
-	AssigneeName   string  `json:"assignee_name"`
-	Priority       string  `json:"priority"`
-	ParentTaskID   *string `json:"parent_task_id"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
+	ID             string         `json:"id"`
+	ProjectID      string         `json:"project_id"`
+	ProjectName    string         `json:"project_name"`
+	ProjectPrefix  string         `json:"project_prefix"`
+	TaskNumber     int            `json:"task_number"`
+	Title          string         `json:"title"`
+	Description    string         `json:"description"`
+	StatusID       *string        `json:"status_id"`
+	StatusName     string         `json:"status_name"`
+	StatusCategory string         `json:"status_category"`
+	StatusColor    string         `json:"status_color"`
+	AssigneeID     *string        `json:"assignee_id"`
+	AssigneeName   string         `json:"assignee_name"`
+	Assignees      []TaskAssignee `json:"assignees"`
+	Priority       string         `json:"priority"`
+	ParentTaskID   *string        `json:"parent_task_id"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
 }
 
 // ProjectItem summary for UI dropdowns.

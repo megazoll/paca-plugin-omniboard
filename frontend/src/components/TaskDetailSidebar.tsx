@@ -109,6 +109,12 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
 
   const formattedDesc = formatDescription(task.description);
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
+  const assignees =
+    task.assignees && task.assignees.length > 0
+      ? task.assignees
+      : task.assignee_name
+        ? [{ id: task.assignee_id || "1", name: task.assignee_name }]
+        : [];
 
   return (
     <>
@@ -180,7 +186,12 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
               </label>
               <select
                 value={task.status_id || ""}
-                onChange={(e) => onStatusChange(task.id, e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && val !== task.status_id) {
+                    onStatusChange(task.id, val);
+                  }
+                }}
                 className="w-full py-1.5 px-2.5 text-xs bg-background border border-input rounded-lg text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
               >
                 {projectStatuses.map((s) => (
@@ -188,7 +199,7 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
                     {s.name} ({s.category})
                   </option>
                 ))}
-                {projectStatuses.length === 0 && (
+                {(!task.status_id || !projectStatuses.some((s) => s.id === task.status_id)) && (
                   <option value={task.status_id || ""}>
                     {task.status_name || "Current Status"}
                   </option>
@@ -212,19 +223,28 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
               </div>
             </div>
 
-            {/* Assignee */}
-            <div className="space-y-1.5">
+            {/* Assignees */}
+            <div className="space-y-1.5 col-span-2 sm:col-span-1">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                 <User className="size-3" />
-                <span>Assignee</span>
+                <span>{assignees.length > 1 ? "Assignees" : "Assignee"}</span>
               </label>
-              <div className="flex items-center gap-2 py-1.5 px-2.5 text-xs bg-background border border-input rounded-lg text-foreground">
-                <div className="size-5 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-[10px] shrink-0">
-                  {task.assignee_name ? task.assignee_name[0].toUpperCase() : "?"}
-                </div>
-                <span className="truncate font-medium">
-                  {task.assignee_name || "Unassigned"}
-                </span>
+              <div className="flex flex-wrap items-center gap-1.5 py-1 px-2 text-xs bg-background border border-input rounded-lg text-foreground min-h-[34px]">
+                {assignees.length === 0 ? (
+                  <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                ) : (
+                  assignees.map((a, idx) => (
+                    <div
+                      key={a.id || idx}
+                      className="flex items-center gap-1.5 bg-muted/60 px-2 py-0.5 rounded-md border border-border/40 text-foreground"
+                    >
+                      <div className="size-4 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-[9px] shrink-0">
+                        {a.name ? a.name[0].toUpperCase() : "?"}
+                      </div>
+                      <span className="truncate font-medium">{a.name}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

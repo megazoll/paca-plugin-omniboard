@@ -218,12 +218,12 @@ func (p *omniboardPlugin) updateBoard(req *plugin.Request, res *plugin.Response)
 // deleteBoard removes a board.
 func (p *omniboardPlugin) deleteBoard(req *plugin.Request, res *plugin.Response) {
 	boardID := req.PathParam("boardId")
-	_, err := p.db.Query(`DELETE FROM omniboards WHERE id = $1`, boardID)
+	_, err := p.db.Exec(`DELETE FROM omniboards WHERE id = $1`, boardID)
 	if err != nil {
 		res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to delete board: %v", err)})
 		return
 	}
-	res.JSON(200, map[string]any{"success": true})
+	ok(res, map[string]any{"success": true})
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
