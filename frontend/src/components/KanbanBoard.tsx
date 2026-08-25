@@ -108,6 +108,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             column={col}
             tasks={colTasks}
             allStatuses={allStatuses}
+            boardFilters={boardFilters}
             onStatusChange={onStatusChange}
             onCardClick={onCardClick}
           />

@@ -13,6 +13,17 @@ export interface BoardFilters {
   projectId?: string;
   assigneeId?: string;
   priority?: string;
+  hide_subtasks?: boolean;
+  done_retention_days?: number;
+  dim_done_days?: number;
+}
+
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  name: string;
+  username: string;
 }
 
 export interface Omniboard {

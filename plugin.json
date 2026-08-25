@@ -2,7 +2,7 @@
   "id": "com.paca.omniboard",
   "displayName": "Omniboard",
   "description": "Multi-project Kanban board plugin for PACA AI to view, filter, and manage tasks across multiple projects.",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "minCoreVersion": "v0.11.2",
   "permissions": [
     "db.read",
@@ -148,6 +148,25 @@
       },
       {
         "method": "GET",
+        "path": "/projects/:projectId/omniboard/members",
+        "middlewares": [
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "projects.read"
+            ]
+          }
+        ]
+      },
+      {
+        "method": "GET",
         "path": "/projects/:projectId/omniboard/boards/:boardId/tasks",
         "middlewares": [
           {
@@ -185,6 +204,25 @@
         ]
       },
       {
+        "method": "PATCH",
+        "path": "/projects/:projectId/omniboard/tasks/:taskId/assignees",
+        "middlewares": [
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "project",
+            "permissions": [
+              "tasks.write"
+            ]
+          }
+        ]
+      },
+      {
         "method": "GET",
         "path": "/omniboard/admin-boards",
         "middlewares": [
@@ -198,7 +236,7 @@
             "name": "requirePermissions",
             "scope": "global",
             "permissions": [
-              "users.write"
+              "users.read"
             ]
           }
         ]
@@ -223,6 +261,25 @@
         ]
       },
       {
+        "method": "GET",
+        "path": "/omniboard/admin-boards/:boardId",
+        "middlewares": [
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.read"
+            ]
+          }
+        ]
+      },
+      {
         "method": "PATCH",
         "path": "/omniboard/admin-boards/:boardId",
         "middlewares": [
@@ -236,7 +293,7 @@
             "name": "requirePermissions",
             "scope": "global",
             "permissions": [
-              "users.write"
+              "users.read"
             ]
           }
         ]
@@ -255,7 +312,7 @@
             "name": "requirePermissions",
             "scope": "global",
             "permissions": [
-              "users.write"
+              "users.read"
             ]
           }
         ]
@@ -300,6 +357,25 @@
       },
       {
         "method": "GET",
+        "path": "/omniboard/admin-members",
+        "middlewares": [
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "users.read"
+            ]
+          }
+        ]
+      },
+      {
+        "method": "GET",
         "path": "/omniboard/admin-boards/:boardId/tasks",
         "middlewares": [
           {
@@ -331,7 +407,26 @@
             "name": "requirePermissions",
             "scope": "global",
             "permissions": [
-              "users.write"
+              "tasks.write"
+            ]
+          }
+        ]
+      },
+      {
+        "method": "PATCH",
+        "path": "/omniboard/admin-tasks/:taskId/assignees",
+        "middlewares": [
+          {
+            "name": "optionalAuthn"
+          },
+          {
+            "name": "requireFreshPassword"
+          },
+          {
+            "name": "requirePermissions",
+            "scope": "global",
+            "permissions": [
+              "tasks.write"
             ]
           }
         ]
@@ -341,11 +436,6 @@
   "frontend": {
     "remoteEntryUrl": "/plugins/com.paca.omniboard/assets/remoteEntry.js",
     "extensionPoints": [
-      {
-        "point": "project.page",
-        "component": "ProjectOmniboardPage",
-        "order": 5
-      },
       {
         "point": "admin.page",
         "component": "AdminOmniboardPage",
@@ -359,14 +449,6 @@
       }
     ],
     "navItems": [
-      {
-        "scope": "project",
-        "slug": "omniboard",
-        "label": "Omniboard",
-        "icon": "Kanban",
-        "component": "ProjectOmniboardPage",
-        "order": 5
-      },
       {
         "scope": "admin",
         "slug": "omniboard",

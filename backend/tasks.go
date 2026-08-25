@@ -109,12 +109,12 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		var assigneeIDSelect, assigneeNameSelect, assigneesSelect, extraJoin string
 		switch cfg.assigneeStrategy {
 		case assigneeTaskAssigneesMember:
-			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
-			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneeIDSelect = "(SELECT ta.member_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(NULLIF(u.full_name, ''), u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 			assigneesSelect = `COALESCE((
 				SELECT json_agg(json_build_object(
-					'id', COALESCE(pm.user_id::text, ta.member_id::text),
-					'name', COALESCE(u.full_name, u.username, '')
+					'id', ta.member_id::text,
+					'name', COALESCE(NULLIF(u.full_name, ''), u.username, '')
 				))
 				FROM task_assignees ta
 				JOIN project_members pm ON ta.member_id = pm.id
@@ -122,12 +122,12 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 				WHERE ta.task_id = t.id
 			), '[]'::json)::text AS assignees_json`
 		case assigneeTaskAssigneesProjectMember:
-			assigneeIDSelect = "(SELECT COALESCE(pm.user_id::text, ta.project_member_id::text) FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
-			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneeIDSelect = "(SELECT ta.project_member_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(NULLIF(u.full_name, ''), u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.project_member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 			assigneesSelect = `COALESCE((
 				SELECT json_agg(json_build_object(
-					'id', COALESCE(pm.user_id::text, ta.project_member_id::text),
-					'name', COALESCE(u.full_name, u.username, '')
+					'id', ta.project_member_id::text,
+					'name', COALESCE(NULLIF(u.full_name, ''), u.username, '')
 				))
 				FROM task_assignees ta
 				JOIN project_members pm ON ta.project_member_id = pm.id
@@ -136,23 +136,23 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 			), '[]'::json)::text AS assignees_json`
 		case assigneeTaskAssigneesUser:
 			assigneeIDSelect = "(SELECT ta.user_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
-			assigneeNameSelect = "(SELECT COALESCE(u.full_name, u.username, '') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneeNameSelect = "(SELECT COALESCE(NULLIF(u.full_name, ''), u.username, '') FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
 			assigneesSelect = `COALESCE((
 				SELECT json_agg(json_build_object(
 					'id', ta.user_id::text,
-					'name', COALESCE(u.full_name, u.username, '')
+					'name', COALESCE(NULLIF(u.full_name, ''), u.username, '')
 				))
 				FROM task_assignees ta
 				JOIN users u ON ta.user_id = u.id
 				WHERE ta.task_id = t.id
 			), '[]'::json)::text AS assignees_json`
 		case assigneeTasksAssigneeID:
-			assigneeIDSelect = "COALESCE(pm.user_id::text, t.assignee_id::text) AS assignee_id"
-			assigneeNameSelect = "COALESCE(u_pm.full_name, u_pm.username, u.full_name, u.username, '') AS assignee_name"
+			assigneeIDSelect = "COALESCE(pm.id::text, t.assignee_id::text) AS assignee_id"
+			assigneeNameSelect = "COALESCE(NULLIF(u_pm.full_name, ''), u_pm.username, NULLIF(u.full_name, ''), u.username, '') AS assignee_name"
 			assigneesSelect = `COALESCE((
 				SELECT json_agg(json_build_object(
-					'id', COALESCE(pm2.user_id::text, t2.assignee_id::text),
-					'name', COALESCE(u_pm2.full_name, u_pm2.username, u2.full_name, u2.username, '')
+					'id', COALESCE(pm2.id::text, t2.assignee_id::text),
+					'name', COALESCE(NULLIF(u_pm2.full_name, ''), u_pm2.username, NULLIF(u2.full_name, ''), u2.username, '')
 				))
 				FROM tasks t2
 				LEFT JOIN project_members pm2 ON t2.assignee_id = pm2.id
@@ -339,10 +339,18 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		for _, r := range taskRows.Rows {
 			sc := newRowScanner(taskRows.Columns, r)
 
-			var assignees []TaskAssignee
-			if err := sc.jsonVal("assignees_json", &assignees); err != nil {
-				assignees = nil
+			var rawAssignees []TaskAssignee
+			if err := sc.jsonVal("assignees_json", &rawAssignees); err != nil {
+				rawAssignees = nil
 			}
+
+			assignees := make([]TaskAssignee, 0)
+			for _, a := range rawAssignees {
+				if a.ID != "" || a.Name != "" {
+					assignees = append(assignees, a)
+				}
+			}
+
 			if len(assignees) == 0 && sc.str("assignee_name") != "" {
 				assignees = []TaskAssignee{
 					{
@@ -350,9 +358,6 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 						Name: sc.str("assignee_name"),
 					},
 				}
-			}
-			if assignees == nil {
-				assignees = make([]TaskAssignee, 0)
 			}
 
 			// Ensure assignee_id and assignee_name are populated from first assignee if available
@@ -396,6 +401,151 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	})
 
 	ok(res, tasks)
+}
+
+// listMembers returns project members across projects or for a specific project.
+func (p *omniboardPlugin) listMembers(req *plugin.Request, res *plugin.Response) {
+	projID := req.QueryParam("projectId")
+	if projID == "" {
+		projID = req.PathParam("projectId")
+	}
+
+	var rows *plugin.DBQueryResult
+	var err error
+
+	queries := []struct {
+		sql  string
+		args []any
+	}{
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = $1 AND pm.deleted_at IS NULL ORDER BY name ASC`
+				}
+				return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.deleted_at IS NULL ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = $1 ORDER BY name ASC`
+				}
+				return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(NULLIF(u.full_name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(u.full_name, u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id WHERE pm.project_id = $1`
+				}
+				return `SELECT pm.id, pm.project_id, pm.user_id, COALESCE(u.full_name, u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN users u ON pm.user_id = u.id`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT id, project_id, user_id FROM project_members WHERE project_id = $1`
+				}
+				return `SELECT id, project_id, user_id FROM project_members`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+	}
+
+	for _, q := range queries {
+		rows, err = p.db.Query(q.sql, q.args...)
+		if err == nil && rows != nil {
+			break
+		}
+	}
+
+	members := make([]ProjectMemberItem, 0)
+	if err == nil && rows != nil {
+		for _, r := range rows.Rows {
+			sc := newRowScanner(rows.Columns, r)
+			members = append(members, ProjectMemberItem{
+				ID:        sc.str("id"),
+				ProjectID: sc.str("project_id"),
+				UserID:    sc.str("user_id"),
+				Name:      sc.str("name"),
+				Username:  sc.str("username"),
+			})
+		}
+	}
+
+	ok(res, members)
+}
+
+// updateTaskAssignees updates a task's assignees in PACA core database.
+func (p *omniboardPlugin) updateTaskAssignees(req *plugin.Request, res *plugin.Response) {
+	taskID := req.PathParam("taskId")
+
+	var input struct {
+		MemberIDs   []string `json:"member_ids"`
+		AssigneeIDs []string `json:"assignee_ids"`
+	}
+	if err := json.Unmarshal(req.Body, &input); err != nil && len(req.Body) > 0 {
+		res.JSON(400, map[string]any{"error": "invalid json payload"})
+		return
+	}
+
+	wanted := input.MemberIDs
+	if len(wanted) == 0 && len(input.AssigneeIDs) > 0 {
+		wanted = input.AssigneeIDs
+	}
+
+	// 1. Delete current task_assignees
+	_, err := p.db.Exec(`DELETE FROM task_assignees WHERE task_id = $1`, taskID)
+	if err != nil {
+		// Fallback for legacy tasks table with single assignee_id column
+		var firstID any = nil
+		if len(wanted) > 0 && wanted[0] != "" {
+			firstID = wanted[0]
+		}
+		_, err2 := p.db.Exec(`UPDATE tasks SET assignee_id = $1, updated_at = $2 WHERE id = $3`, firstID, nowStr(), taskID)
+		if err2 != nil {
+			res.JSON(500, map[string]any{"error": fmt.Sprintf("failed to update task assignees: %v", err)})
+			return
+		}
+		ok(res, map[string]any{"success": true})
+		return
+	}
+
+	// 2. Insert new task_assignees
+	for _, mid := range wanted {
+		if mid == "" {
+			continue
+		}
+		_, _ = p.db.Exec(`INSERT INTO task_assignees (task_id, member_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, taskID, mid)
+	}
+
+	// 3. Update tasks.updated_at
+	_, _ = p.db.Exec(`UPDATE tasks SET updated_at = $1 WHERE id = $2`, nowStr(), taskID)
+
+	ok(res, map[string]any{"success": true})
 }
 
 // updateTaskStatus updates a task's status_id in PACA core database.

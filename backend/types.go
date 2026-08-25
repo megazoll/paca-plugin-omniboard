@@ -36,6 +36,15 @@ type TaskAssignee struct {
 	Name string `json:"name"`
 }
 
+// ProjectMemberItem represents a project member with user information.
+type ProjectMemberItem struct {
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	UserID    string `json:"user_id"`
+	Name      string `json:"name"`
+	Username  string `json:"username"`
+}
+
 // CrossProjectTask represents a task with attached project & status metadata.
 type CrossProjectTask struct {
 	ID             string         `json:"id"`

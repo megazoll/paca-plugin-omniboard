@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { User } from "lucide-react";
-import type { CrossProjectTask, StatusInfo } from "../types";
+import type { ColumnConfig, CrossProjectTask, StatusInfo } from "../types";
 import { cn } from "../lib/utils";
 
 interface KanbanCardProps {
   task: CrossProjectTask;
+  column?: ColumnConfig;
+  boardFilters?: Record<string, any>;
   allStatuses: StatusInfo[];
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
@@ -12,6 +14,8 @@ interface KanbanCardProps {
 
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   task,
+  column,
+  boardFilters,
   allStatuses,
   onStatusChange,
   onCardClick,
@@ -47,12 +51,61 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         ? [{ id: task.assignee_id || "1", name: task.assignee_name }]
         : [];
 
+  const isDoneTask = useMemo(() => {
+    const cat = (task.status_category || "").toLowerCase().replace(/[\s_-]/g, "");
+    if (cat === "done" || cat === "completed" || cat === "closed" || cat === "resolved") {
+      return true;
+    }
+    if (column?.status_categories?.some((c) => {
+      const norm = c.toLowerCase().replace(/[\s_-]/g, "");
+      return norm === "done" || norm === "completed" || norm === "closed" || norm === "resolved";
+    })) {
+      return true;
+    }
+    return false;
+  }, [task.status_category, column]);
+
+  const dimOpacityClass = useMemo(() => {
+    if (!isDoneTask || !boardFilters?.dim_done_days) return "";
+    const dimDays = Number(boardFilters.dim_done_days);
+    if (dimDays === 0) return "";
+
+    const timestamp = task.updated_at || task.created_at;
+    if (!timestamp) return "";
+    const ageDays = (Date.now() - new Date(timestamp).getTime()) / (1000 * 60 * 60 * 24);
+
+    if (dimDays > 0) {
+      if (ageDays >= dimDays) {
+        return "opacity-40 hover:opacity-100 dark:opacity-35 dark:hover:opacity-100 transition-opacity duration-200";
+      }
+      return "";
+    }
+
+    // Progressive dimming when dimDays === -1
+    if (dimDays === -1) {
+      if (ageDays >= 14) {
+        return "opacity-35 hover:opacity-100 dark:opacity-30 dark:hover:opacity-100 transition-opacity duration-200";
+      }
+      if (ageDays >= 7) {
+        return "opacity-45 hover:opacity-100 dark:opacity-40 dark:hover:opacity-100 transition-opacity duration-200";
+      }
+      if (ageDays >= 3) {
+        return "opacity-60 hover:opacity-100 dark:opacity-55 dark:hover:opacity-100 transition-opacity duration-200";
+      }
+      if (ageDays >= 1) {
+        return "opacity-75 hover:opacity-100 dark:opacity-70 dark:hover:opacity-100 transition-opacity duration-200";
+      }
+    }
+    return "";
+  }, [isDoneTask, boardFilters?.dim_done_days, task.updated_at, task.created_at]);
+
   return (
     <div
       onClick={() => onCardClick?.(task)}
       className={cn(
         "group relative rounded-xl border border-border/30 bg-card p-3 shadow-xs cursor-pointer transition-all duration-150 select-none",
-        "hover:border-border/50 hover:shadow-sm"
+        "hover:border-border/50 hover:shadow-sm",
+        dimOpacityClass
       )}
     >
       {/* Task Key (e.g. PROJ-123) matching PACA native format */}

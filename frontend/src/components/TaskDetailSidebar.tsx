@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   ExternalLink,
@@ -8,16 +8,21 @@ import {
   Calendar,
   AlertCircle,
   FileText,
+  Copy,
+  Check,
+  Plus,
 } from "lucide-react";
-import type { CrossProjectTask, StatusInfo } from "../types";
+import type { CrossProjectTask, ProjectMember, StatusInfo } from "../types";
 
 interface TaskDetailSidebarProps {
   task: CrossProjectTask | null;
   isOpen: boolean;
   onClose: () => void;
   allStatuses: StatusInfo[];
+  members?: ProjectMember[];
   onStatusChange: (taskId: string, newStatusId: string) => void;
-  onNavigateToTask: (projectId: string, taskId: string) => void;
+  onAssigneesChange?: (taskId: string, memberIds: string[]) => void;
+  onNavigateToTask?: (projectId: string, taskId: string) => void;
 }
 
 export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
@@ -25,9 +30,13 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
   isOpen,
   onClose,
   allStatuses,
+  members = [],
   onStatusChange,
+  onAssigneesChange,
   onNavigateToTask,
 }) => {
+  const [copied, setCopied] = useState(false);
+
   // Close on Escape key press
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,6 +49,16 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen || !task) return null;
+
+  const taskUrl = `/projects/${task.project_id}/tasks/${task.id}`;
+
+  const handleCopyLink = () => {
+    const fullUrl = `${window.location.origin}${taskUrl}`;
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const getPriorityMeta = (priority?: string) => {
     const p = (priority || "").toLowerCase();
@@ -109,12 +128,34 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
 
   const formattedDesc = formatDescription(task.description);
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
+
+  // Available project members
+  const projectMembers = members.filter((m) => !m.project_id || m.project_id === task.project_id);
+
+  // Current assignees
   const assignees =
     task.assignees && task.assignees.length > 0
       ? task.assignees
       : task.assignee_name
-        ? [{ id: task.assignee_id || "1", name: task.assignee_name }]
+        ? [{ id: task.assignee_id || "", name: task.assignee_name }]
         : [];
+
+  const assignedMemberIds = new Set(assignees.map((a) => a.id).filter(Boolean));
+  const availableMembers = projectMembers.filter((m) => !assignedMemberIds.has(m.id));
+
+  const handleAddAssignee = (memberId: string) => {
+    if (!memberId || !onAssigneesChange) return;
+    const currentIds = assignees.map((a) => a.id).filter(Boolean);
+    if (!currentIds.includes(memberId)) {
+      onAssigneesChange(task.id, [...currentIds, memberId]);
+    }
+  };
+
+  const handleRemoveAssignee = (memberId: string) => {
+    if (!onAssigneesChange) return;
+    const updatedIds = assignees.map((a) => a.id).filter((id) => id && id !== memberId);
+    onAssigneesChange(task.id, updatedIds);
+  };
 
   return (
     <>
@@ -144,16 +185,26 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons: Navigate to task detail & Close */}
+          {/* Action Buttons: Navigate/Open in new window & Close */}
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => onNavigateToTask(task.project_id, task.id)}
+            <a
+              href={taskUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all duration-150"
-              title="Open full task page"
+              title="Open full task page in new window"
             >
               <span>Open Task</span>
               <ExternalLink className="size-3.5" />
+            </a>
+
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex size-8 items-center justify-center rounded-lg border border-border/40 text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+              title="Copy task link"
+            >
+              {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
             </button>
 
             <button
@@ -223,27 +274,66 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
               </div>
             </div>
 
-            {/* Assignees */}
-            <div className="space-y-1.5 col-span-2 sm:col-span-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                <User className="size-3" />
-                <span>{assignees.length > 1 ? "Assignees" : "Assignee"}</span>
-              </label>
-              <div className="flex flex-wrap items-center gap-1.5 py-1 px-2 text-xs bg-background border border-input rounded-lg text-foreground min-h-[34px]">
+            {/* Assignees Management */}
+            <div className="space-y-1.5 col-span-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <User className="size-3" />
+                  <span>{assignees.length > 1 ? "Assignees" : "Assignee"} ({assignees.length})</span>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 p-2 text-xs bg-background border border-input rounded-lg text-foreground min-h-[38px]">
                 {assignees.length === 0 ? (
-                  <span className="text-muted-foreground italic text-xs">Unassigned</span>
+                  <span className="text-muted-foreground italic text-xs px-1">Unassigned</span>
                 ) : (
                   assignees.map((a, idx) => (
                     <div
                       key={a.id || idx}
-                      className="flex items-center gap-1.5 bg-muted/60 px-2 py-0.5 rounded-md border border-border/40 text-foreground"
+                      className="flex items-center gap-1.5 bg-muted/60 pl-2 pr-1.5 py-1 rounded-md border border-border/40 text-foreground group/assignee"
                     >
-                      <div className="size-4 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-[9px] shrink-0">
+                      <div className="size-4.5 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-[9px] shrink-0">
                         {a.name ? a.name[0].toUpperCase() : "?"}
                       </div>
                       <span className="truncate font-medium">{a.name}</span>
+                      {onAssigneesChange && a.id && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAssignee(a.id)}
+                          className="size-4 ml-0.5 rounded-full flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                          title={`Remove ${a.name}`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
                     </div>
                   ))
+                )}
+
+                {/* Add Assignee Dropdown */}
+                {onAssigneesChange && availableMembers.length > 0 && (
+                  <div className="relative inline-block">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddAssignee(e.target.value);
+                          e.target.value = "";
+                        }
+                      }}
+                      className="py-1 pl-2 pr-5 text-xs bg-muted/40 hover:bg-muted/70 border border-dashed border-border/60 rounded-md text-muted-foreground hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 cursor-pointer transition-colors"
+                      title="Add assignee"
+                    >
+                      <option value="" disabled>
+                        + Add assignee
+                      </option>
+                      {availableMembers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name || m.username}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             </div>
@@ -260,12 +350,12 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
             </div>
 
             {/* Created At */}
-            <div className="space-y-1.5 col-span-2">
+            <div className="space-y-1.5">
               <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                 <Calendar className="size-3" />
                 <span>Created</span>
               </label>
-              <div className="py-1 px-2 text-xs text-muted-foreground">
+              <div className="py-1.5 px-2.5 text-xs bg-background border border-input rounded-lg text-muted-foreground truncate">
                 {formatDate(task.created_at)}
               </div>
             </div>
@@ -298,14 +388,15 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
             Press <kbd className="px-1.5 py-0.5 text-[10px] bg-muted border border-border/60 rounded font-mono">Esc</kbd> to close
           </span>
 
-          <button
-            type="button"
-            onClick={() => onNavigateToTask(task.project_id, task.id)}
+          <a
+            href={taskUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
           >
             <span>Open in project</span>
             <ExternalLink className="size-3.5" />
-          </button>
+          </a>
         </div>
       </aside>
     </>

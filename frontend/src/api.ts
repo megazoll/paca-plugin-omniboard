@@ -8,6 +8,7 @@ import type {
   Omniboard,
   OmniboardScope,
   ProjectInfo,
+  ProjectMember,
   StatusInfo,
   UpdateOmniboardInput,
 } from "./types";
@@ -33,11 +34,25 @@ function getStatusesPath(api: PluginApiClient, scope: OmniboardScope): string {
   return `/projects/${api.projectId}/omniboard/statuses`;
 }
 
+function getMembersPath(api: PluginApiClient, scope: OmniboardScope, projectId?: string): string {
+  if (scope === "admin" || !api.projectId) {
+    return projectId ? `/omniboard/admin-members?projectId=${projectId}` : "/omniboard/admin-members";
+  }
+  return `/projects/${api.projectId}/omniboard/members`;
+}
+
 function getTaskStatusPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
   if (scope === "admin" || !api.projectId) {
     return `/omniboard/admin-tasks/${taskId}/status`;
   }
   return `/projects/${api.projectId}/omniboard/tasks/${taskId}/status`;
+}
+
+function getTaskAssigneesPath(api: PluginApiClient, scope: OmniboardScope, taskId: string): string {
+  if (scope === "admin" || !api.projectId) {
+    return `/omniboard/admin-tasks/${taskId}/assignees`;
+  }
+  return `/projects/${api.projectId}/omniboard/tasks/${taskId}/assignees`;
 }
 
 async function unwrapData<T>(promise: Promise<any>): Promise<T> {
@@ -89,6 +104,15 @@ export function useOmniboardStatuses(api: PluginApiClient, scope: OmniboardScope
   return useQuery<StatusInfo[], Error>({
     queryKey: ["plugin", PLUGIN_ID, "statuses", scope],
     queryFn: () => unwrapData<StatusInfo[]>(api.pluginGet(PLUGIN_ID, path)),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useOmniboardMembers(api: PluginApiClient, scope: OmniboardScope = "project", projectId?: string) {
+  const path = getMembersPath(api, scope, projectId);
+  return useQuery<ProjectMember[], Error>({
+    queryKey: ["plugin", PLUGIN_ID, "members", scope, projectId || "all"],
+    queryFn: () => unwrapData<ProjectMember[]>(api.pluginGet(PLUGIN_ID, path)),
     staleTime: 60 * 1000,
   });
 }
@@ -157,6 +181,17 @@ export function useUpdateTaskStatus(api: PluginApiClient, scope: OmniboardScope 
   return useMutation({
     mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
       unwrapData<any>(api.pluginPatch(PLUGIN_ID, getTaskStatusPath(api, scope, taskId), { status_id: statusId })),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
+    },
+  });
+}
+
+export function useUpdateTaskAssignees(api: PluginApiClient, scope: OmniboardScope = "project") {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, memberIds }: { taskId: string; memberIds: string[] }) =>
+      unwrapData<any>(api.pluginPatch(PLUGIN_ID, getTaskAssigneesPath(api, scope, taskId), { member_ids: memberIds })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["plugin", PLUGIN_ID, "tasks"] });
     },

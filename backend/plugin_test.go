@@ -302,6 +302,91 @@ func TestUpdateTaskStatus(t *testing.T) {
 	}
 }
 
+func TestListMembers(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("projects",
+		[]string{"id", "name", "description", "task_id_prefix"},
+		[][]any{
+			{testProjectID, "Project One", "First test project", "P1"},
+		},
+	)
+	tc.DB.SeedRows("users",
+		[]string{"id", "username", "full_name"},
+		[][]any{
+			{"user-1", "jdoe", "John Doe"},
+			{"user-2", "asmith", ""},
+		},
+	)
+	tc.DB.SeedRows("project_members",
+		[]string{"id", "project_id", "user_id"},
+		[][]any{
+			{"pm-1", testProjectID, "user-1"},
+			{"pm-2", testProjectID, "user-2"},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{"projectId": testProjectID}
+	res := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/members", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	members := decodeData[[]ProjectMemberItem](t, res)
+	if len(members) != 2 {
+		t.Fatalf("expected 2 members, got %d", len(members))
+	}
+}
+
+func TestUpdateTaskAssignees(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("tasks",
+		[]string{"id", "project_id", "task_number", "title", "status_id", "created_at", "updated_at"},
+		[][]any{
+			{"task-1", testProjectID, 1, "Task 1", "status-todo", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+		},
+	)
+	tc.DB.SeedRows("task_assignees",
+		[]string{"task_id", "member_id"},
+		[][]any{
+			{"task-1", "pm-1"},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{"taskId": "task-1"}
+	req.Body = []byte(`{"member_ids":["pm-1","pm-2"]}`)
+
+	res := tc.Call("PATCH", "/projects/"+testProjectID+"/omniboard/tasks/task-1/assignees", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(res.Body, &env); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !env.Success {
+		t.Errorf("expected success=true")
+	}
+}
+
+
 
 
 

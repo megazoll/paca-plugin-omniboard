@@ -6,6 +6,7 @@ interface KanbanColumnProps {
   column: ColumnConfig;
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
+  boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
 }
@@ -14,6 +15,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   column,
   tasks,
   allStatuses,
+  boardFilters,
   onStatusChange,
   onCardClick,
 }) => {
@@ -49,6 +51,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           <KanbanCard
             key={task.id}
             task={task}
+            column={column}
+            boardFilters={boardFilters}
             allStatuses={allStatuses}
             onStatusChange={onStatusChange}
             onCardClick={onCardClick}

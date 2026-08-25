@@ -10,10 +10,12 @@ import {
   useOmniboardTasks,
   useOmniboardProjects,
   useOmniboardStatuses,
+  useOmniboardMembers,
   useCreateOmniboard,
   useUpdateOmniboard,
   useDeleteOmniboard,
   useUpdateTaskStatus,
+  useUpdateTaskAssignees,
 } from "./api";
 import type { BoardFilters, Omniboard, ColumnConfig, CrossProjectTask } from "./types";
 
@@ -31,6 +33,7 @@ function Content(props: AdminPageProps) {
   const { data: boards = [], isLoading: loadingBoards } = useOmniboards(api, scope);
   const { data: projects = [] } = useOmniboardProjects(api, scope);
   const { data: statuses = [] } = useOmniboardStatuses(api, scope);
+  const { data: members = [] } = useOmniboardMembers(api, scope);
 
   const getInitialBoardId = () => {
     try {
@@ -118,6 +121,7 @@ function Content(props: AdminPageProps) {
   const updateMutation = useUpdateOmniboard(api, scope);
   const deleteMutation = useDeleteOmniboard(api, scope);
   const statusMutation = useUpdateTaskStatus(api, scope);
+  const assigneesMutation = useUpdateTaskAssignees(api, scope);
 
   const handleCreateBoard = () => {
     createMutation.mutate(
@@ -178,6 +182,32 @@ function Content(props: AdminPageProps) {
         },
       }
     );
+  };
+
+  const handleAssigneesChange = (taskId: string, memberIds: string[]) => {
+    assigneesMutation.mutate(
+      { taskId, memberIds },
+      {
+        onSuccess: () => {
+          ui?.toast({ title: "Task assignees updated", variant: "success" });
+        },
+      }
+    );
+    if (selectedTask && selectedTask.id === taskId) {
+      const updatedAssignees = memberIds
+        .map((mid) => {
+          const m = members.find((mem) => mem.id === mid);
+          return m ? { id: m.id, name: m.name || m.username } : null;
+        })
+        .filter(Boolean) as { id: string; name: string }[];
+
+      setSelectedTask({
+        ...selectedTask,
+        assignees: updatedAssignees,
+        assignee_id: updatedAssignees[0]?.id || null,
+        assignee_name: updatedAssignees[0]?.name || "",
+      });
+    }
   };
 
   // Open right sidebar when clicking a card
@@ -274,7 +304,9 @@ function Content(props: AdminPageProps) {
         isOpen={!!selectedTask}
         onClose={() => setSelectedTask(null)}
         allStatuses={statuses}
+        members={members}
         onStatusChange={handleSidebarStatusChange}
+        onAssigneesChange={handleAssigneesChange}
         onNavigateToTask={handleNavigateToTask}
       />
     </div>

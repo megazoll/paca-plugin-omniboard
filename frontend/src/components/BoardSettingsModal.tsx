@@ -35,6 +35,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
   const [columns, setColumns] = useState<ColumnConfig[]>([]);
   const [hideSubtasks, setHideSubtasks] = useState(false);
   const [doneRetentionDays, setDoneRetentionDays] = useState(0);
+  const [dimDoneDays, setDimDoneDays] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
       setSelectedProjectIds(board.project_ids || []);
       setHideSubtasks(Boolean(board.filters?.hide_subtasks));
       setDoneRetentionDays(Number(board.filters?.done_retention_days || 0));
+      setDimDoneDays(Number(board.filters?.dim_done_days || 0));
       setColumns(
         board.column_config && board.column_config.length > 0
           ? board.column_config
@@ -61,6 +63,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
       setSelectedProjectIds([]);
       setHideSubtasks(false);
       setDoneRetentionDays(0);
+      setDimDoneDays(0);
       setColumns([
         { id: "col-backlog", title: "Backlog", status_categories: ["backlog"], color: "#64748b" },
         { id: "col-todo", title: "To Do", status_categories: ["todo"], color: "#eab308" },
@@ -119,6 +122,7 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
         ...(board?.filters || {}),
         hide_subtasks: hideSubtasks,
         done_retention_days: doneRetentionDays,
+        dim_done_days: dimDoneDays,
       },
     });
   };
@@ -267,6 +271,29 @@ export const BoardSettingsModal: React.FC<BoardSettingsModalProps> = ({
                 <option value={14}>Hide completed older than 14 days (2 weeks)</option>
                 <option value={30}>Hide completed older than 30 days (1 month)</option>
                 <option value={90}>Hide completed older than 90 days (3 months)</option>
+              </select>
+            </div>
+
+            {/* Option 3: Dim Done tasks by age */}
+            <div className="pt-3 border-t border-border/40 space-y-1.5">
+              <label className="block text-sm font-medium text-foreground">
+                Dim completed tasks by age
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Dim cards in Done columns after days pass (hovering brings card back to 100% opacity).
+              </p>
+              <select
+                value={dimDoneDays}
+                onChange={(e) => setDimDoneDays(Number(e.target.value))}
+                className="w-full sm:w-80 py-1.5 px-2.5 text-xs bg-background border border-input rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
+              >
+                <option value={0}>Disabled (Do not dim)</option>
+                <option value={1}>Dim tasks older than 1 day</option>
+                <option value={3}>Dim tasks older than 3 days</option>
+                <option value={7}>Dim tasks older than 7 days (1 week)</option>
+                <option value={14}>Dim tasks older than 14 days (2 weeks)</option>
+                <option value={30}>Dim tasks older than 30 days (1 month)</option>
+                <option value={-1}>Progressive dimming (fade older tasks gradually)</option>
               </select>
             </div>
           </div>
