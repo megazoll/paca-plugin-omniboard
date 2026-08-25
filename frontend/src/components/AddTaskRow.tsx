@@ -1,12 +1,14 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import type { ProjectInfo } from "../types";
+import type { ProjectInfo, TaskTypeInfo } from "../types";
 import { ProjectSelector } from "./ProjectSelector";
+import { TaskTypeSelector } from "./TaskTypeSelector";
 
 interface AddTaskRowProps {
   projects: ProjectInfo[];
   defaultProjectId?: string;
-  onAdd: (title: string, projectId: string) => Promise<void> | void;
+  taskTypes?: TaskTypeInfo[];
+  onAdd: (title: string, projectId: string, taskTypeId: string | null) => Promise<void> | void;
   /** "board" renders card-style box; "list" renders inline row */
   variant?: "board" | "list";
   label?: string;
@@ -17,6 +19,7 @@ interface AddTaskRowProps {
 export const AddTaskRow: React.FC<AddTaskRowProps> = ({
   projects,
   defaultProjectId,
+  taskTypes = [],
   onAdd,
   variant = "board",
   label = "Add task",
@@ -26,12 +29,26 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const effectiveProjectId =
     selectedProjectId ||
     defaultProjectId ||
     (projects.length > 0 ? projects[0].id : "");
+
+  const projectTaskTypes = useMemo(() => {
+    if (!taskTypes || taskTypes.length === 0) return [];
+    const filtered = taskTypes.filter(
+      (tt) => !tt.project_id || tt.project_id === effectiveProjectId
+    );
+    return filtered.length > 0 ? filtered : taskTypes;
+  }, [taskTypes, effectiveProjectId]);
+
+  const defaultType =
+    projectTaskTypes.find((tt) => tt.is_default) ?? projectTaskTypes[0] ?? null;
+  const selectedType =
+    projectTaskTypes.find((tt) => tt.id === selectedTypeId) ?? defaultType;
 
   const openForm = () => {
     setOpen(true);
@@ -42,9 +59,10 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
     const title = value.trim();
     if (!title || !effectiveProjectId || isSubmitting) return;
     try {
-      await onAdd(title, effectiveProjectId);
+      await onAdd(title, effectiveProjectId, selectedType?.id ?? null);
       setValue("");
       setSelectedProjectId(null);
+      setSelectedTypeId(null);
       setOpen(false);
     } catch {
       // Keep open if error occurs
@@ -54,6 +72,7 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
   const cancel = () => {
     setValue("");
     setSelectedProjectId(null);
+    setSelectedTypeId(null);
     setOpen(false);
   };
 
@@ -62,7 +81,19 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
     <ProjectSelector
       projects={projects}
       value={effectiveProjectId}
-      onChange={setSelectedProjectId}
+      onChange={(pid) => {
+        setSelectedProjectId(pid);
+        setSelectedTypeId(null);
+      }}
+    />
+  );
+
+  // Task type selector component
+  const taskTypeSelector = projectTaskTypes.length > 0 && selectedType && (
+    <TaskTypeSelector
+      taskTypes={projectTaskTypes}
+      value={selectedType.id}
+      onChange={setSelectedTypeId}
     />
   );
 
@@ -118,9 +149,10 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
   if (variant === "board") {
     return (
       <div className="rounded-xl border border-border/30 bg-card/50 p-2.5 shadow-xs">
-        {projectSelector && (
-          <div className="flex items-center gap-1.5 mb-2">{projectSelector}</div>
-        )}
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          {taskTypeSelector}
+          {projectSelector}
+        </div>
         <input
           ref={inputRef}
           value={value}
@@ -143,7 +175,8 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
   // ── Open state: list variant ──────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-1.5 px-4 py-2.5 border-b border-border/20">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {taskTypeSelector}
         {projectSelector}
         <input
           ref={inputRef}
@@ -155,7 +188,7 @@ export const AddTaskRow: React.FC<AddTaskRowProps> = ({
           }}
           placeholder={placeholder}
           disabled={isSubmitting}
-          className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/50 text-foreground"
+          className="flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-muted-foreground/50 text-foreground min-w-[150px]"
         />
         {actionButtons}
       </div>

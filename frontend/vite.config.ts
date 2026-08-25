@@ -7,14 +7,21 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "use-sync-external-store/shim/with-selector",
+        find: /^use-sync-external-store\/shim\/with-selector(\.js)?$/,
         replacement: path.resolve(
           __dirname,
           "src/shims/use-sync-external-store-with-selector-shim.ts",
         ),
       },
       {
-        find: "use-sync-external-store/shim",
+        find: /^use-sync-external-store\/shim(\/index\.js|\/index)?$/,
+        replacement: path.resolve(
+          __dirname,
+          "src/shims/use-sync-external-store-shim.ts",
+        ),
+      },
+      {
+        find: /^use-sync-external-store(\/index\.js|\/index)?$/,
         replacement: path.resolve(
           __dirname,
           "src/shims/use-sync-external-store-shim.ts",

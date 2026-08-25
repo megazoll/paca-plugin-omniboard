@@ -149,6 +149,7 @@ function Content(props: ViewExtensionProps) {
   const handleCreateTask = async (
     title: string,
     projectId: string,
+    taskTypeId: string | null,
     column: ColumnConfig
   ) => {
     const projectStatuses = statuses.filter((s) => s.project_id === projectId);
@@ -159,6 +160,7 @@ function Content(props: ViewExtensionProps) {
         project_id: projectId,
         title,
         status_id: targetStatusId,
+        task_type_id: taskTypeId,
       });
       ui?.toast({ title: "Task created", variant: "success" });
     } catch (err: any) {
@@ -370,6 +372,7 @@ function Content(props: ViewExtensionProps) {
             tasks={tasks}
             allStatuses={statuses}
             projects={boardProjects}
+            taskTypes={taskTypes}
             defaultProjectId={defaultProjectId}
             boardFilters={activeBoard.filters}
             onStatusChange={handleStatusChange}

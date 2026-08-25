@@ -1,5 +1,5 @@
 import React from "react";
-import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo } from "../types";
+import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo, TaskTypeInfo } from "../types";
 import { KanbanCard } from "./KanbanCard";
 import { AddTaskRow } from "./AddTaskRow";
 
@@ -8,11 +8,17 @@ interface KanbanColumnProps {
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
   projects?: ProjectInfo[];
+  taskTypes?: TaskTypeInfo[];
   defaultProjectId?: string;
   boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
-  onCreateTask?: (title: string, projectId: string, column: ColumnConfig) => Promise<void> | void;
+  onCreateTask?: (
+    title: string,
+    projectId: string,
+    taskTypeId: string | null,
+    column: ColumnConfig
+  ) => Promise<void> | void;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
@@ -20,6 +26,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   tasks,
   allStatuses,
   projects = [],
+  taskTypes = [],
   defaultProjectId,
   boardFilters,
   onStatusChange,
@@ -69,8 +76,11 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           <AddTaskRow
             variant="board"
             projects={projects}
+            taskTypes={taskTypes}
             defaultProjectId={defaultProjectId}
-            onAdd={(title, projectId) => onCreateTask(title, projectId, column)}
+            onAdd={(title, projectId, taskTypeId) =>
+              onCreateTask(title, projectId, taskTypeId, column)
+            }
           />
         )}
       </div>

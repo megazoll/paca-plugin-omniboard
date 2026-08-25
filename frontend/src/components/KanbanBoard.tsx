@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo } from "../types";
+import type { ColumnConfig, CrossProjectTask, ProjectInfo, StatusInfo, TaskTypeInfo } from "../types";
 import { KanbanColumn } from "./KanbanColumn";
 
 interface KanbanBoardProps {
@@ -7,11 +7,17 @@ interface KanbanBoardProps {
   tasks: CrossProjectTask[];
   allStatuses: StatusInfo[];
   projects?: ProjectInfo[];
+  taskTypes?: TaskTypeInfo[];
   defaultProjectId?: string;
   boardFilters?: Record<string, any>;
   onStatusChange: (taskId: string, newStatusId: string) => void;
   onCardClick?: (task: CrossProjectTask) => void;
-  onCreateTask?: (title: string, projectId: string, column: ColumnConfig) => Promise<void> | void;
+  onCreateTask?: (
+    title: string,
+    projectId: string,
+    taskTypeId: string | null,
+    column: ColumnConfig
+  ) => Promise<void> | void;
 }
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -26,6 +32,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks: rawTasks,
   allStatuses,
   projects = [],
+  taskTypes = [],
   defaultProjectId,
   boardFilters,
   onStatusChange,
@@ -115,6 +122,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             tasks={colTasks}
             allStatuses={allStatuses}
             projects={projects}
+            taskTypes={taskTypes}
             defaultProjectId={defaultProjectId}
             boardFilters={boardFilters}
             onStatusChange={onStatusChange}
