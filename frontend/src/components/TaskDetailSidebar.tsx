@@ -116,7 +116,6 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
     }
   };
 
-  const formattedDesc = formatDescription(task.description);
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
   const projectTaskTypes = taskTypes.filter((tt) => !tt.project_id || tt.project_id === task.project_id);
 
