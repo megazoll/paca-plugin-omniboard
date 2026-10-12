@@ -2,8 +2,8 @@
   "id": "com.paca.omniboard",
   "displayName": "Omniboard",
   "description": "Multi-project Kanban board plugin for PACA AI to view, filter, and manage tasks across multiple projects.",
-  "version": "0.1.17",
-  "minCoreVersion": "v0.11.2",
+  "version": "0.1.18",
+  "minCoreVersion": "v0.19.0",
   "permissions": [
     "db.read",
     "db.write",
@@ -24,10 +24,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -43,10 +43,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.write"
+            "actions": [
+              "projects:write"
             ]
           }
         ]
@@ -62,10 +62,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -81,10 +81,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.write"
+            "actions": [
+              "projects:write"
             ]
           }
         ]
@@ -100,10 +100,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.write"
+            "actions": [
+              "projects:write"
             ]
           }
         ]
@@ -119,10 +119,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -138,10 +138,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -157,10 +157,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -176,10 +176,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -195,10 +195,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "projects.read"
+            "actions": [
+              "projects:read"
             ]
           }
         ]
@@ -214,10 +214,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -233,10 +233,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -252,10 +252,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -271,10 +271,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -290,10 +290,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "project",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -309,10 +309,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -328,10 +328,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.write"
+            "actions": [
+              "users:write"
             ]
           }
         ]
@@ -347,10 +347,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -366,10 +366,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -385,10 +385,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -404,10 +404,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.write"
+            "actions": [
+              "users:write"
             ]
           }
         ]
@@ -423,10 +423,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.write"
+            "actions": [
+              "users:write"
             ]
           }
         ]
@@ -442,10 +442,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -461,10 +461,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.read"
+            "actions": [
+              "users:read"
             ]
           }
         ]
@@ -480,10 +480,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "users.write"
+            "actions": [
+              "users:write"
             ]
           }
         ]
@@ -499,10 +499,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -518,10 +518,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -537,10 +537,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -556,10 +556,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
@@ -575,10 +575,10 @@
             "name": "requireFreshPassword"
           },
           {
-            "name": "requirePermissions",
+            "name": "requireActions",
             "scope": "global",
-            "permissions": [
-              "tasks.write"
+            "actions": [
+              "tasks:write"
             ]
           }
         ]
