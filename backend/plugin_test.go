@@ -573,6 +573,76 @@ func TestListMembers_UnifiedAccounts(t *testing.T) {
 	}
 }
 
+func TestGetBoardTasks_UnifiedAccounts(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("omniboards",
+		[]string{"id", "project_id", "scope", "name", "description", "project_ids", "column_config", "filters", "created_by", "created_at", "updated_at"},
+		[][]any{
+			{"board-1", testProjectID, "project", "Main Omniboard", "Multi-project Kanban board", "[]", "[]", "{}", "user-1", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+		},
+	)
+	tc.DB.SeedRows("projects",
+		[]string{"id", "name", "description", "task_id_prefix"},
+		[][]any{
+			{testProjectID, "Project One", "First test project", "P1"},
+		},
+	)
+	tc.DB.SeedRows("task_statuses",
+		[]string{"id", "project_id", "name", "color", "category", "position", "is_default"},
+		[][]any{
+			{"status-todo", testProjectID, "To Do", "#eab308", "todo", 1, true},
+		},
+	)
+	tc.DB.SeedRows("accounts",
+		[]string{"id", "kind", "name", "deleted_at"},
+		[][]any{
+			{"acc-1", "user", "Alice Smith", nil},
+		},
+	)
+	tc.DB.SeedRows("project_members",
+		[]string{"id", "project_id", "account_id", "deleted_at"},
+		[][]any{
+			{"pm-1", testProjectID, "acc-1", nil},
+		},
+	)
+	tc.DB.SeedRows("tasks",
+		[]string{"id", "project_id", "task_number", "title", "description", "status_id", "created_at", "updated_at"},
+		[][]any{
+			{"task-1", testProjectID, 1, "First task", "Task description 1", "status-todo", "2026-08-01T00:00:00Z", "2026-08-01T00:00:00Z"},
+		},
+	)
+	tc.DB.SeedRows("task_assignees",
+		[]string{"task_id", "member_id"},
+		[][]any{
+			{"task-1", "pm-1"},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{
+		"projectId": testProjectID,
+		"boardId":   "board-1",
+	}
+	res := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/boards/board-1/tasks", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	tasks := decodeData[[]CrossProjectTask](t, res)
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].Title != "First task" {
+		t.Errorf("expected title 'First task', got %q", tasks[0].Title)
+	}
+}
+
 
 
 

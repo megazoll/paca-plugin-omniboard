@@ -2,7 +2,7 @@
   "id": "com.paca.omniboard",
   "displayName": "Omniboard",
   "description": "Multi-project Kanban board plugin for PACA AI to view, filter, and manage tasks across multiple projects.",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "minCoreVersion": "v0.19.0",
   "permissions": [
     "db.read",
