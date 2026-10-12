@@ -66,16 +66,6 @@ export const TaskDetailSidebar: React.FC<TaskDetailSidebarProps> = ({
     });
   };
 
-  const handleSaveDescription = async () => {
-    if (!onDescriptionChange) return;
-    try {
-      setIsSavingDesc(true);
-      await onDescriptionChange(task.id, descValue);
-      setIsEditingDesc(false);
-    } finally {
-      setIsSavingDesc(false);
-    }
-  };
 
   const getPriorityMeta = (priority?: string) => {
     const p = (priority || "").toLowerCase();

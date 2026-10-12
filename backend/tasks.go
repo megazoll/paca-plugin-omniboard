@@ -150,7 +150,8 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 	type assigneeStrategy int
 	const (
-		assigneeTaskAssigneesMember assigneeStrategy = iota
+		assigneeUnifiedAccounts assigneeStrategy = iota
+		assigneeTaskAssigneesMember
 		assigneeTaskAssigneesProjectMember
 		assigneeTaskAssigneesUser
 		assigneeTasksAssigneeID
@@ -186,6 +187,20 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 
 		var assigneeIDSelect, assigneeNameSelect, assigneesSelect, extraJoin string
 		switch cfg.assigneeStrategy {
+		case assigneeUnifiedAccounts:
+			assigneeIDSelect = "(SELECT ta.member_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
+			assigneeNameSelect = "(SELECT COALESCE(NULLIF(ac.name, ''), u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
+			assigneesSelect = `COALESCE((
+				SELECT json_agg(json_build_object(
+					'id', ta.member_id::text,
+					'name', COALESCE(NULLIF(ac.name, ''), u.username, '')
+				))
+				FROM task_assignees ta
+				JOIN project_members pm ON ta.member_id = pm.id
+				JOIN accounts ac ON pm.account_id = ac.id
+				LEFT JOIN users u ON ac.id = u.id
+				WHERE ta.task_id = t.id
+			), '[]'::json)::text AS assignees_json`
 		case assigneeTaskAssigneesMember:
 			assigneeIDSelect = "(SELECT ta.member_id::text FROM task_assignees ta WHERE ta.task_id = t.id LIMIT 1) AS assignee_id"
 			assigneeNameSelect = "(SELECT COALESCE(NULLIF(u.full_name, ''), u.username, '') FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id LIMIT 1) AS assignee_name"
@@ -321,13 +336,17 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 		if filterAssignee != "" {
 			if filterAssignee == "unassigned" {
 				switch cfg.assigneeStrategy {
-				case assigneeTaskAssigneesMember, assigneeTaskAssigneesProjectMember, assigneeTaskAssigneesUser:
+				case assigneeUnifiedAccounts, assigneeTaskAssigneesMember, assigneeTaskAssigneesProjectMember, assigneeTaskAssigneesUser:
 					sqlParts = append(sqlParts, "AND NOT EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id)")
 				case assigneeTasksAssigneeID:
 					sqlParts = append(sqlParts, "AND t.assignee_id IS NULL")
 				}
 			} else {
 				switch cfg.assigneeStrategy {
+				case assigneeUnifiedAccounts:
+					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id WHERE ta.task_id = t.id AND (pm.account_id::text = $%d OR ta.member_id::text = $%d OR ac.name = $%d OR u.username = $%d))", argIdx, argIdx, argIdx, argIdx))
+					args = append(args, filterAssignee)
+					argIdx++
 				case assigneeTaskAssigneesMember:
 					sqlParts = append(sqlParts, fmt.Sprintf("AND EXISTS (SELECT 1 FROM task_assignees ta JOIN project_members pm ON ta.member_id = pm.id LEFT JOIN users u ON pm.user_id = u.id WHERE ta.task_id = t.id AND (pm.user_id::text = $%d OR ta.member_id::text = $%d OR u.full_name = $%d OR u.username = $%d))", argIdx, argIdx, argIdx, argIdx))
 					args = append(args, filterAssignee)
@@ -375,6 +394,7 @@ func (p *omniboardPlugin) getBoardTasks(req *plugin.Request, res *plugin.Respons
 	}
 
 	assigneeStrategies := []assigneeStrategy{
+		assigneeUnifiedAccounts,
 		assigneeTaskAssigneesMember,
 		assigneeTaskAssigneesProjectMember,
 		assigneeTaskAssigneesUser,
@@ -502,6 +522,50 @@ func (p *omniboardPlugin) listMembers(req *plugin.Request, res *plugin.Response)
 		sql  string
 		args []any
 	}{
+		// PACA v0.19.0+ unified accounts (with accounts table and project_members.account_id)
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(NULLIF(ac.name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id WHERE pm.project_id = $1 AND pm.deleted_at IS NULL AND ac.deleted_at IS NULL ORDER BY name ASC`
+				}
+				return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(NULLIF(ac.name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id WHERE pm.deleted_at IS NULL AND ac.deleted_at IS NULL ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(NULLIF(ac.name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id WHERE pm.project_id = $1 ORDER BY name ASC`
+				}
+				return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(NULLIF(ac.name, ''), u.username, '') AS name, COALESCE(u.username, '') AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id LEFT JOIN users u ON ac.id = u.id ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(ac.name, '') AS name, '' AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id WHERE pm.project_id = $1 AND pm.deleted_at IS NULL ORDER BY name ASC`
+				}
+				return `SELECT pm.id, pm.project_id, pm.account_id::text AS user_id, COALESCE(ac.name, '') AS name, '' AS username FROM project_members pm JOIN accounts ac ON pm.account_id = ac.id WHERE pm.deleted_at IS NULL ORDER BY name ASC`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
+		// Legacy pre-v0.19.0 schemas
 		{
 			sql: func() string {
 				if projID != "" {
@@ -558,6 +622,20 @@ func (p *omniboardPlugin) listMembers(req *plugin.Request, res *plugin.Response)
 				return nil
 			}(),
 		},
+		{
+			sql: func() string {
+				if projID != "" {
+					return `SELECT id, project_id, account_id FROM project_members WHERE project_id = $1`
+				}
+				return `SELECT id, project_id, account_id FROM project_members`
+			}(),
+			args: func() []any {
+				if projID != "" {
+					return []any{projID}
+				}
+				return nil
+			}(),
+		},
 	}
 
 	for _, q := range queries {
@@ -571,10 +649,14 @@ func (p *omniboardPlugin) listMembers(req *plugin.Request, res *plugin.Response)
 	if err == nil && rows != nil {
 		for _, r := range rows.Rows {
 			sc := newRowScanner(rows.Columns, r)
+			uid := sc.str("user_id")
+			if uid == "" {
+				uid = sc.str("account_id")
+			}
 			members = append(members, ProjectMemberItem{
 				ID:        sc.str("id"),
 				ProjectID: sc.str("project_id"),
-				UserID:    sc.str("user_id"),
+				UserID:    uid,
 				Name:      sc.str("name"),
 				Username:  sc.str("username"),
 			})

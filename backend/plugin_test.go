@@ -521,6 +521,58 @@ func TestUpdateTaskDescription(t *testing.T) {
 	}
 }
 
+func TestListMembers_UnifiedAccounts(t *testing.T) {
+	tc := plugintest.NewContext(t)
+
+	tc.DB.SeedRows("projects",
+		[]string{"id", "name", "description", "task_id_prefix"},
+		[][]any{
+			{testProjectID, "Project One", "First test project", "P1"},
+		},
+	)
+	tc.DB.SeedRows("accounts",
+		[]string{"id", "kind", "name", "deleted_at"},
+		[][]any{
+			{"acc-1", "user", "Alice Smith", nil},
+			{"acc-2", "user", "Bob Jones", nil},
+		},
+	)
+	tc.DB.SeedRows("users",
+		[]string{"id", "username"},
+		[][]any{
+			{"acc-1", "asmith"},
+			{"acc-2", "bjones"},
+		},
+	)
+	tc.DB.SeedRows("project_members",
+		[]string{"id", "project_id", "account_id", "deleted_at"},
+		[][]any{
+			{"pm-1", testProjectID, "acc-1", nil},
+			{"pm-2", testProjectID, "acc-2", nil},
+		},
+	)
+
+	var p omniboardPlugin
+	if err := p.Init(tc.PluginContext()); err != nil {
+		t.Fatal("Init failed:", err)
+	}
+
+	req := callerReq()
+	req.PathParams = map[string]string{"projectId": testProjectID}
+	res := tc.Call("GET", "/projects/"+testProjectID+"/omniboard/members", req)
+	if res.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d: %s", res.StatusCode, res.BodyString())
+	}
+
+	members := decodeData[[]ProjectMemberItem](t, res)
+	if len(members) != 2 {
+		t.Fatalf("expected 2 members, got %d", len(members))
+	}
+	if members[0].UserID == "" || members[1].UserID == "" {
+		t.Errorf("expected UserID to be populated, got %+v", members)
+	}
+}
+
 
 
 

@@ -47,12 +47,16 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   const TaskTypeIcon = getTaskTypeIconComponent(task.task_type_icon);
 
   const projectStatuses = allStatuses.filter((s) => s.project_id === task.project_id);
-  const assignees =
-    task.assignees && task.assignees.length > 0
-      ? task.assignees
-      : task.assignee_name
-        ? [{ id: task.assignee_id || "1", name: task.assignee_name }]
-        : [];
+  const assignees = useMemo(() => {
+    if (task.assignees && task.assignees.length > 0) {
+      const valid = task.assignees.filter((a) => a && (a.name || a.id));
+      if (valid.length > 0) return valid;
+    }
+    if (task.assignee_name && task.assignee_name.trim()) {
+      return [{ id: task.assignee_id || "1", name: task.assignee_name.trim() }];
+    }
+    return [];
+  }, [task.assignees, task.assignee_name, task.assignee_id]);
 
   const isDoneTask = useMemo(() => {
     const cat = (task.status_category || "").toLowerCase().replace(/[\s_-]/g, "");
@@ -188,7 +192,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             title={assignees[0].name}
             className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-border/25 shrink-0 bg-linear-to-br from-primary/20 to-primary/15 text-primary"
           >
-            {assignees[0].name.slice(0, 1).toUpperCase()}
+            {(assignees[0].name?.trim() ? assignees[0].name.trim().slice(0, 1) : "?").toUpperCase()}
           </div>
         ) : (
           <div
@@ -200,7 +204,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 key={a.id || idx}
                 className="flex size-5 items-center justify-center rounded-full text-[10px] font-bold ring-1 ring-card bg-linear-to-br from-primary/20 to-primary/15 text-primary shrink-0"
               >
-                {a.name.slice(0, 1).toUpperCase()}
+                {(a.name?.trim() ? a.name.trim().slice(0, 1) : "?").toUpperCase()}
               </div>
             ))}
             {assignees.length > 3 && (
